@@ -52,9 +52,7 @@ class GeodesicMonteCarlo:
 class SphericalGeodesicMonteCarlo(GeodesicMonteCarlo):
     
     def projection(self, x, v):
-        proj_matrix = torch.bmm(x.unsqueeze(-1), x.unsqueeze(1))
-        v = v.unsqueeze(-1) - torch.bmm(proj_matrix, v.unsqueeze(-1)) 
-        v = v.squeeze(-1)
+        v = v - (x*v).sum(dim=-1).unsqueeze(-1) * x
         return v
     
     def geodesic(self, x, v):
