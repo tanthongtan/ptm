@@ -2,8 +2,8 @@ import torch
 from lcdk import Logcdk
 import torch.nn.functional as F
 
-def unnormalized_log_prob_spherical_dirichlet(alpha, pi):
-    return ((2*alpha-1)*torch.log(torch.abs(pi))).sum(dim=-1)
+def unnormalized_log_prob_spherical_dirichlet(alpha, theta):
+    return ((2*alpha-1)*torch.log(torch.abs(theta))).sum(dim=-1)
 
 def log_prob_von_mises_fisher(D, natural_param, X):
     logcdk = Logcdk.apply
