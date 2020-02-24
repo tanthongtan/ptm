@@ -10,7 +10,7 @@ import torch.distributions as dist
 
 def grad(f, independent_axes):
     def result(x):
-        if independent_axes == 0:
+        if independent_axes == None:
             output_shape = torch.tensor(1.)
         elif independent_axes == 1:
             output_shape = torch.ones(x.shape[0])
@@ -29,7 +29,7 @@ class GeodesicMonteCarlo:
         global accept_prob
         v = dist.MultivariateNormal(torch.zeros(x.shape[-1]), torch.eye(x.shape[-1])).sample([x.shape[0]])
         v = self.projection(x, v)
-        h = distribution.unnormalized_log_prob(x) - 0.5 * (v*v).sum(dim=-1)
+        h = distribution.unnormalized_log_prob(x) - 0.5 * v.norm(dim=distribution.independent_axes)**2
         x_star = x.clone()
         for _ in range(self.T):
             v = v + self.eta/2.0 * grad(distribution.unnormalized_log_prob, distribution.independent_axes)(x_star)
@@ -37,7 +37,7 @@ class GeodesicMonteCarlo:
             x_star, v = self.geodesic(x_star, v)
             v = v + self.eta/2.0 * grad(distribution.unnormalized_log_prob, distribution.independent_axes)(x_star)
             v = self.projection(x_star, v)
-        h_star = distribution.unnormalized_log_prob(x_star) - 0.5 * (v*v).sum(dim=-1)
+        h_star = distribution.unnormalized_log_prob(x_star) - 0.5 * v.norm(dim=distribution.independent_axes)**2
         u = torch.rand_like(h_star)
         accept_prob = torch.exp(h_star - h)
         x_star[u >= accept_prob, :] = x[u >= accept_prob, :]

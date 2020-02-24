@@ -34,7 +34,7 @@ class SamFullConditionalMuDistribution:
         self.mu0 = mu0
         self.kappa0 = kappa0
         self.kappa1 = kappa1
-        self.independent_axes = 0
+        self.independent_axes = None
     
     def unnormalized_log_prob(self, mu):
         logcdk = Logcdk.apply
