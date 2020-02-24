@@ -26,7 +26,6 @@ class GeodesicMonteCarlo:
         self.eta = eta 
     
     def transition(self, x, distribution):
-        global accept_prob
         v = dist.MultivariateNormal(torch.zeros(x.shape[-1]), torch.eye(x.shape[-1])).sample([x.shape[0]])
         v = self.projection(x, v)
         h = distribution.unnormalized_log_prob(x) - 0.5 * v.norm(dim=distribution.independent_axes)**2
@@ -41,7 +40,7 @@ class GeodesicMonteCarlo:
         u = torch.rand_like(h_star)
         accept_prob = torch.exp(h_star - h)
         x_star[u >= accept_prob, :] = x[u >= accept_prob, :]
-        return x_star
+        return x_star, accept_prob
         
     def projection(self, x, v):
         raise NotImplementedError
