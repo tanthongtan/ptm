@@ -51,6 +51,7 @@ class VptmFullConditionalThetaDistribution:
         self.mu = mu
         self.kappa = kappa
         self.alpha = alpha
+        self.independent_axes = 1
         
     def unnormalized_log_prob(self, theta):
         pi = theta**2
@@ -67,6 +68,7 @@ class VptmFullConditionalMuDistribution:
         self.c0 = c0
         self.mu0 = mu0
         self.kappa0 = kappa0
+        self.independent_axes = None
         
     def unnormalized_log_prob(self, mu):
         logcdk = Logcdk.apply
@@ -83,6 +85,7 @@ class VptmFullConditionalKappaDistribution:
         self.mu = mu
         self.m = m
         self.sigma_squared = sigma_squared
+        self.independent_axes = None
         
     def unnormalized_log_prob(self, kappa):
         pi = self.theta ** 2
