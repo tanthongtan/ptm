@@ -108,7 +108,7 @@ class VptmStochasticFullConditionalMuKappaDistribution:
     def unnormalized_log_prob(self, mu, kappa):
         logcdk = Logcdk.apply
         pi = self.theta ** 2
-        avg = torch.bmm(pi, (kappa * mu).unsqueeze(0))
+        avg = torch.matmul(pi, (kappa * mu).unsqueeze(0))
         return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, (self.x).unsqueeze(0)).sum() \
                 - logcdk(self.mu0.shape[-1], (self.kappa0 * self.mu0 + self.c0 * mu.sum(dim=0)).norm(p=2, dim=-1))\
                  + dist.LogNormal(self.m, self.sigma_squared).log_prob(kappa).sum()
