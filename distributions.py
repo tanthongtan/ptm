@@ -92,3 +92,26 @@ class VptmFullConditionalKappaDistribution:
         avg = torch.matmul(pi, kappa * self.mu)
         return log_prob_von_mises_fisher(self.mu.shape[-1], avg, self.x).sum() + \
                 dist.LogNormal(self.m, self.sigma_squared).log_prob(kappa).sum()
+                
+class VptmStochasticFullConditionalMuKappaDistribution:
+    
+    def __init__(self, x, theta, c0, mu0, kappa0, m, sigma_squared):
+        self.x = x
+        self.theta = theta
+        self.c0 = c0
+        self.mu0 = mu0
+        self.kappa0 = kappa0
+        self.m = m
+        self.sigma_squared = sigma_squared
+        self.independent_axes = None
+        
+    def unnormalized_log_prob(self, mu, kappa):
+        logcdk = Logcdk.apply
+        pi = self.theta ** 2
+        avg = torch.bmm(pi, (kappa * mu).unsqueeze(0))
+        return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, (self.x).unsqueeze(0)).sum() \
+                - logcdk(self.mu0.shape[-1], (self.kappa0 * self.mu0 + self.c0 * mu.sum(dim=0)).norm(p=2, dim=-1))\
+                 + dist.LogNormal(self.m, self.sigma_squared).log_prob(kappa).sum()
+                
+    
+       
