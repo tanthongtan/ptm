@@ -41,8 +41,8 @@ class SggmcVptm:
             v_mu_star= v_mu_star + update_mu
             v_kappa_star = v_kappa_star + update_kappa
             #scale
-            v_mu_star = torch.exp(-self.c*self.eta/2) * v_mu_star
-            v_kappa_star = torch.exp(-self.c*self.eta/2) * v_kappa_star
+            v_mu_star = np.exp(-self.c*self.eta/2) * v_mu_star
+            v_kappa_star = np.exp(-self.c*self.eta/2) * v_kappa_star
             #geodesic
             mu_star, v_mu_star = self.spherical_geodesic(mu_star, v_mu_star)
             kappa_star, v_kappa_star = self.positive_geodesic(kappa_star, v_kappa_star)
