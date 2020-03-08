@@ -34,7 +34,7 @@ class SggmcVptm:
             v_mu_star = np.exp(-self.c*self.eta/2) * v_mu_star
             v_kappa_star = np.exp(-self.c*self.eta/2) * v_kappa_star
             #get grads
-            grad_mu, grad_kappa = grad2var(distribution, distribution.independent_axes)(mu_star, kappa_star)
+            grad_mu, grad_kappa = grad2var(distribution.unnormalized_log_prob, distribution.independent_axes)(mu_star, kappa_star)
             update_mu = self.spherical_projection(mu_star,grad_mu*self.eta+dist.MultivariateNormal(torch.zeros(mu_star.shape[-1]), 2*self.c*self.eta*torch.eye(mu_star.shape[-1])).sample([mu_star.shape[0]]))
             update_kappa = self.positive_projection(kappa_star,grad_kappa*self.eta+dist.MultivariateNormal(torch.zeros(kappa_star.shape[-1]), 2*self.c*self.eta*torch.eye(kappa_star.shape[-1])).sample([kappa_star.shape[0]]))
             #update grads
