@@ -31,8 +31,8 @@ class SggmcVptm:
             mu_star, v_mu_star = self.spherical_geodesic(mu_star, v_mu_star)
             kappa_star, v_kappa_star = self.positive_geodesic(kappa_star, v_kappa_star)
             #scale
-            v_mu_star = torch.exp(-self.c*self.eta/2) * v_mu_star
-            v_kappa_star = torch.exp(-self.c*self.eta/2) * v_kappa_star
+            v_mu_star = np.exp(-self.c*self.eta/2) * v_mu_star
+            v_kappa_star = np.exp(-self.c*self.eta/2) * v_kappa_star
             #get grads
             grad_mu, grad_kappa = grad2var(distribution, distribution.independent_axes)(mu_star, kappa_star)
             update_mu = self.spherical_projection(mu_star,grad_mu*self.eta+dist.MultivariateNormal(torch.zeros(mu_star.shape[-1]), 2*self.c*self.eta*torch.eye(mu_star.shape[-1])).sample([mu_star.shape[0]]))
