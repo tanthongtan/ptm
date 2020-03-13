@@ -73,3 +73,13 @@ class PositiveHamiltonianMonteCarlo(GeodesicMonteCarlo):
         x_new[x_new<0] = -x_new[x_new<0]
         v_new[x_new<0] = -v_new[x_new<0]
         return (x_new, v_new)
+    
+class HamiltonianMonteCarlo(GeodesicMonteCarlo):
+    
+    def projection(self, x, v):
+        return v
+    
+    def geodesic(self, x, v):
+        x_new = x + self.eta * v
+        v_new = v
+        return (x_new, v_new)
