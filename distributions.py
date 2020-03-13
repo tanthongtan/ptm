@@ -7,7 +7,7 @@ def unnormalized_log_prob_spherical_dirichlet(alpha, theta):
     return ((2*alpha-1)*torch.log(torch.abs(theta))).sum(dim=-1)
 
 def log_prob_stickbreaking_dirichlet(alpha, theta, pi):
-    return dist.Dirichlet(alpha).log_prob(pi).sum() - dist.StickBreakingTransform().inv.log_abs_det_jacobian(pi, theta)
+    return dist.Dirichlet(alpha).log_prob(pi) - dist.StickBreakingTransform().inv.log_abs_det_jacobian(pi, theta)
 
 
 def log_prob_von_mises_fisher(D, natural_param, X):
