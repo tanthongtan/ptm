@@ -117,5 +117,30 @@ class VptmStochasticFullConditionalMuKappaDistribution:
                 - logcdk(self.mu0.shape[-1], (self.kappa0 * self.mu0 + self.c0 * mu.sum(dim=0)).norm(p=2, dim=-1))\
                  + dist.LogNormal(self.m, self.sigma_squared).log_prob(kappa).sum()
                 
-    
-       
+class MptmFullConditionalThetaDistribution:
+
+    def __init__(self, x, lamb, alpha):
+        self.x = x
+        self.lamb = lamb
+        self.alpha = alpha
+        
+    def unnormalized_log_prob(self, theta):
+        pi = dist.StickBreakingTransform()(theta)
+        beta = torch.distributions.StickBreakingTransform()(self.lamb)
+        avg = torch.exp(torch.matmul(pi, torch.log(beta)))
+        return dist.Multinomial(probs = avg).log_prob(self.x) \
+                + dist.Dirichlet(self.alpha).log_prob(pi)
+
+class MptmFullConditionalLambDistribution:
+
+    def __init__(self, x, theta, eta):
+        self.x = x
+        self.theta = theta
+        self.eta = eta
+        
+    def unnormalized_log_prob(self, lamb):
+        pi = dist.StickBreakingTransform()(self.theta)
+        beta = torch.distributions.StickBreakingTransform()(lamb)
+        avg = torch.exp(torch.matmul(pi, torch.log(beta)))
+        return dist.Multinomial(probs = avg).log_prob(self.x).sum() \
+                + dist.Dirichlet(self.eta).log_prob(beta).sum()
