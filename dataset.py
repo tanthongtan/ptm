@@ -53,6 +53,21 @@ def load_20news_diff():
                   idx = int(temp[0])
                   val = float(temp[1])
                   data_tr[i-1][idx] = val
+                  
+    with open('data/20News-diff/diff.test.tfidf1.data') as file:
+      for i, line in enumerate(file):
+          tokens = line.split()
+          if i == 0:
+              num_te = int(tokens[1])
+              data_te = np.zeros((num_te, vocab_size))
+          elif i == num_te + 1:
+              pass
+          else:
+              for token in tokens[2:]:
+                  temp = token.split(':')
+                  idx = int(temp[0])
+                  val = float(temp[1])
+                  data_te[i-1][idx] = val
                 
     vocab = {}
     with open('data/20News-diff/diff.voc') as file:
@@ -60,5 +75,6 @@ def load_20news_diff():
             vocab[line.strip()] = i
     
     tensor_tr = torch.tensor(data_tr).float()
+    tensor_te = torch.tensor(data_te).float()
     
-    return data_tr, tensor_tr, vocab, vocab_size, num_tr
+    return data_tr, data_te, tensor_tr, tensor_te, vocab, vocab_size, num_tr
