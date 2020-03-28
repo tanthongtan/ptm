@@ -61,11 +61,14 @@ class GeodesicMonteCarlo:
 
 class Geodesic:
     
-    def __init__(self, eta = 1e-2, gamma=None, rho=None, N=None):
+    def __init__(self, eta = 1e-2, c=None, gamma=None, rho=None, N=None):
         if eta is not None:
             self.eta = eta
         else:
             self.eta = np.sqrt(gamma/N)
+        if c is not None:
+            self.c = c
+        elif rho is not None:
             self.c = rho/self.eta
         
     def projection(self, x, v):

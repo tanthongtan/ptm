@@ -212,3 +212,21 @@ class MptmJointDistributionWithStickDir:
         return dist.Multinomial(probs = avg).log_prob(self.x).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum() \
                 + log_prob_stickbreaking_dirichlet(self.eta, lamb, beta).sum()
+                
+class LdaJointDistributionWithStickDir:
+    
+    def __init__(self, x, alpha, eta):
+        self.x = x 
+        self.alpha = alpha
+        self.eta = eta
+        
+    def unnormalized_log_prob(self, params):
+        theta = params['theta']
+        pi = dist.StickBreakingTransform()(theta)
+        lamb = params['lamb']
+        beta = torch.distributions.StickBreakingTransform()(lamb)
+        avg = torch.matmul(pi, beta)
+        return dist.Multinomial(probs = avg).log_prob(self.x).sum() \
+                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum() \
+                + log_prob_stickbreaking_dirichlet(self.eta, lamb, beta).sum()                
+                
