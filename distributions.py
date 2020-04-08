@@ -147,6 +147,37 @@ class VptmJointDistributionWithStickDir:
         mu = params['mu']
         avg = torch.matmul(pi, kappa * mu)
         return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum()
+    
+class VptmJointDistributionWithSphereDir:
+    
+    def __init__(self, x, alpha, c0, mu0, kappa0, m, sigma_squared):
+        self.x = x
+        self.alpha = alpha
+        self.c0 = c0
+        self.mu0 = mu0
+        self.kappa0 = kappa0
+        self.m = m
+        self.sigma_squared = sigma_squared
+        
+    def unnormalized_log_prob(self, params):
+        logcdk = Logcdk.apply
+        theta = params['theta']
+        pi = theta ** 2.
+        kappa = params['kappa']
+        mu = params['mu']
+        avg = torch.matmul(pi, kappa * mu)
+        return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum() \
+                - logcdk(self.mu0.shape[-1], (self.kappa0 * self.mu0 + self.c0 * mu.sum(dim=0)).norm(p=2, dim=-1)) \
+                + dist.LogNormal(self.m, self.sigma_squared).log_prob(kappa).sum() \
+                + unnormalized_log_prob_spherical_dirichlet(self.alpha, theta).sum()
+                
+    def log_likelihood(self, params):
+        theta = params['theta']
+        pi = theta ** 2.
+        kappa = params['kappa']
+        mu = params['mu']
+        avg = torch.matmul(pi, kappa * mu)
+        return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum()
                 
 class VptmStochasticFullConditionalMuKappaDistribution:
     
