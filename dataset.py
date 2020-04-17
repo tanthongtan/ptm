@@ -14,7 +14,7 @@ def sparse_to_numpy(x, vocab_size):
             out[i][id] = count
     return out
 
-def load_20news(use_tfidf = False, normalize = True):
+def load_20news(use_tfidf = False, normalize = True, sublinear = False):
     train_set = pickle.load(open("data/20news/train_set.p", "rb"))
     test_set = pickle.load(open("data/20news/test_set.p", "rb"))
     vocab = pickle.load(open("data/20news/vocab.p", "rb"))
@@ -23,7 +23,7 @@ def load_20news(use_tfidf = False, normalize = True):
     data_te = sparse_to_numpy(test_set, vocab_size)
     
     if use_tfidf == True:
-        tfidf = TfidfTransformer()
+        tfidf = TfidfTransformer(sublinear_tf=sublinear)
         data_tr = np.array(tfidf.fit_transform(data_tr).todense())
         data_te = np.array(tfidf.transform(data_te).todense())
     
