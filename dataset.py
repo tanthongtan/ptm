@@ -46,7 +46,9 @@ def load_20news_5k(use_tfidf = False, normalize = True, sublinear = False):
     vocab = pickle.load(open("data/20news5k/vocab.p", "rb"))
     vocab_size = len(vocab)    
     data_tr = train_set.toarray()
+    data_tr=data_tr[data_tr.sum(axis=-1) > 0]
     data_te = test_set.toarray()
+    data_te=data_te[data_te.sum(axis=-1) > 0]
     
     if use_tfidf == True:
         tfidf = TfidfTransformer(sublinear_tf=sublinear)
