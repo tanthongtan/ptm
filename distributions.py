@@ -275,7 +275,7 @@ class MptmJointDistributionWithSphereDir:
         theta = params['theta']
         pi = theta ** 2.
         lamb = params['lamb']
-        beta = torch.distributions.StickBreakingTransform()(lamb)
+        beta = lamb ** 2.
         avg = torch.exp(torch.matmul(pi, torch.log(beta)))
         return dist.Multinomial(probs = avg).log_prob(self.x).sum() \
                 + unnormalized_log_prob_spherical_dirichlet(self.alpha, theta).sum() \
@@ -309,7 +309,7 @@ class LdaJointDistributionWithSphereDir:
         theta = params['theta']
         pi = theta ** 2.
         lamb = params['lamb']
-        beta = torch.distributions.StickBreakingTransform()(lamb)
+        beta = lamb ** 2.
         avg = torch.matmul(pi, beta)
         return dist.Multinomial(probs = avg).log_prob(self.x).sum() \
                 + unnormalized_log_prob_spherical_dirichlet(self.alpha, theta).sum() \
