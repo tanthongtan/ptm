@@ -156,18 +156,21 @@ class VptmJointDistributionWithStickDirGammaVMFPrior:
     
 class VptmJointDistributionWithStickDirConjugatePrior:
     
-    def __init__(self, x, alpha, c, mu0, v):
+    def __init__(self, x, alpha, c, mu0, v, positive = False):
         self.x = x
         self.alpha = alpha
         self.c = c
         self.mu0 = mu0
         self.v = v
+        self.positive = positive
         
     def unnormalized_log_prob(self, params):
         theta = params['theta']
         pi = dist.StickBreakingTransform()(theta)
         kappa = params['kappa']
         mu = params['mu']
+        if self.positive = True:
+            mu = torch.abs(mu)
         avg = torch.matmul(pi, kappa * mu)
         return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum() \
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
