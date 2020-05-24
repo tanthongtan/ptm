@@ -18,6 +18,10 @@ def log_prob_von_mises_fisher_polar(x, mu, kappa):
     logcdk = Logcdk.apply
     return logcdk(mu.shape[-1], kappa) + kappa * (mu * x).sum(dim=-1)
 
+def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
+    logcdk = Logcdk.apply
+    return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1)
+
 
 class SamJointDistributionWithStickDir:
     
@@ -140,6 +144,33 @@ class VptmJointDistributionWithStickDirGammaVMFPrior:
         return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum() \
                 + log_prob_von_mises_fisher_polar(mu, self.mu0, self.c0 * kappa).sum() \
                 + dist.Gamma(self.a, self.b).log_prob(kappa).sum() \
+                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+                
+    def log_likelihood(self, params):
+        theta = params['theta']
+        pi = dist.StickBreakingTransform()(theta)
+        kappa = params['kappa']
+        mu = params['mu']
+        avg = torch.matmul(pi, kappa * mu)
+        return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum()
+    
+class VptmJointDistributionWithStickDirConjugatePrior:
+    
+    def __init__(self, x, alpha, c, mu0, v):
+        self.x = x
+        self.alpha = alpha
+        self.c = c
+        self.mu0 = mu0
+        self.v = v
+        
+    def unnormalized_log_prob(self, params):
+        theta = params['theta']
+        pi = dist.StickBreakingTransform()(theta)
+        kappa = params['kappa']
+        mu = params['mu']
+        avg = torch.matmul(pi, kappa * mu)
+        return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum() \
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
                 
     def log_likelihood(self, params):
