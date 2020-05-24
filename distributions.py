@@ -169,7 +169,7 @@ class VptmJointDistributionWithStickDirConjugatePrior:
         pi = dist.StickBreakingTransform()(theta)
         kappa = params['kappa']
         mu = params['mu']
-        if self.positive = True:
+        if self.positive == True:
             mu = torch.abs(mu)
         avg = torch.matmul(pi, kappa * mu)
         return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum() \
