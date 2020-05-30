@@ -40,6 +40,32 @@ def load_20news(use_tfidf = False, normalize = True, sublinear = False):
     
     return (data_tr, data_te, tensor_tr, tensor_te, vocab, vocab_size, num_tr)
 
+def load_nips(use_tfidf = False, normalize = True, sublinear = False):
+    train_set = pickle.load(open("data/nips/x_train.p", "rb"))
+    test_set = None#pickle.load(open("data/nips/test_set.p", "rb"))
+    vocab = pickle.load(open("data/nips/vocab.p", "rb"))
+    vocab_size = len(vocab)    
+    data_tr = sparse_to_numpy(train_set, vocab_size)
+    data_te = sparse_to_numpy(test_set, vocab_size)
+    
+    if use_tfidf == True:
+        tfidf = TfidfTransformer(sublinear_tf=sublinear)
+        data_tr = np.array(tfidf.fit_transform(data_tr).todense())
+        data_te = np.array(tfidf.transform(data_te).todense())
+    
+    num_tr = data_tr.shape[0]
+    #--------------print the data dimentions--------------------------
+    print('Dim Training Data',data_tr.shape)
+    print('Dim Test Data',data_te.shape)
+    #--------------make tensor datasets-------------------------------
+    tensor_tr = torch.tensor(data_tr).float()
+    tensor_te = torch.tensor(data_te).float()
+    if normalize == True:
+        tensor_tr = F.normalize(tensor_tr)
+        tensor_te = F.normalize(tensor_te)
+    
+    return (data_tr, data_te, tensor_tr, tensor_te, vocab, vocab_size, num_tr)
+
 def load_20news_5k(use_tfidf = False, normalize = True, sublinear = False):
     train_set = pickle.load(open("data/20news5k/x_train.p", "rb"))
     test_set = pickle.load(open("data/20news5k/x_test.p", "rb"))
