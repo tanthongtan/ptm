@@ -53,8 +53,7 @@ class GeodesicMonteCarlo:
             for name, param_star in params_star.items():
                 params_star[name], vs_star[name] = geodesics[name].geodesic(param_star, vs_star[name])
                 vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
-                update = geodesics[name].projection(param_star,grads[name]*geodesics[name].eta+dist.MultivariateNormal(torch.zeros(param_star.shape[-1]), 2*geodesics[name].c*geodesics[name].eta*torch.eye(param_star.shape[-1])).sample([param_star.shape[0]]))
-                vs_star[name] = vs_star[name] + update
+                vs_star[name] = geodesics[name].projection(param_star, vs_star[name] + grads[name]*geodesics[name].eta+dist.MultivariateNormal(torch.zeros(param_star.shape[-1]), 2*geodesics[name].c*geodesics[name].eta*torch.eye(param_star.shape[-1])).sample([param_star.shape[0]]))
                 vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
                 params_star[name], vs_star[name] = geodesics[name].geodesic(param_star, vs_star[name])                
         return params_star, vs_star
