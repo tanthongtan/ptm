@@ -6,9 +6,9 @@ import torch.distributions as dist
 def log_prob_stickbreaking_dirichlet(alpha, theta, pi):
     return dist.Dirichlet(alpha).log_prob(pi) - dist.StickBreakingTransform().inv.log_abs_det_jacobian(pi, theta)
 
-def log_prob_von_mises_fisher(D, natural_param, X):
+def log_prob_von_mises_fisher(natural_param, X):
     logcdk = Logcdk.apply
-    return logcdk(D, natural_param.norm(p=2, dim=-1)) + (natural_param * X).sum(dim = -1)
+    return logcdk(natural_param.shape[-1], natural_param.norm(p=2, dim=-1)) + (natural_param * X).sum(dim = -1)
 
 def log_prob_von_mises_fisher_polar(x, mu, kappa):
     logcdk = Logcdk.apply
@@ -57,6 +57,6 @@ class VptmJointDistributionWithStickDirConjugatePrior:
         if self.positive == True:
             mu = torch.abs(mu)
         avg = torch.matmul(pi, kappa * mu)
-        return log_prob_von_mises_fisher(self.mu0.shape[-1], avg, self.x).sum() \
+        return log_prob_von_mises_fisher(avg, self.x).sum() \
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
