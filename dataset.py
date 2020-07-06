@@ -4,7 +4,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 import torch.nn.functional as F
 import torch
 
-def load_data(use_tfidf, normalize, sublinear = False, dataset):
+def load_data(dataset, use_tfidf, normalize, sublinear = False):
     train_set = pickle.load(open("data/x_train_"+dataset+".p", "rb"))
     test_set = pickle.load(open("data/x_test_"+dataset+".p", "rb"))
     vocab = pickle.load(open("data/vocab_"+dataset+".p", "rb"))
