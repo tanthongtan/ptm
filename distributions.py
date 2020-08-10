@@ -8,16 +8,24 @@ def log_prob_stickbreaking_dirichlet(alpha, theta, pi):
 
 def log_prob_von_mises_fisher(natural_param, X):
     logcdk = Logcdk.apply
-    return logcdk(natural_param.shape[-1], natural_param.norm(p=2, dim=-1)) + (natural_param * X).sum(dim = -1)
-
-def log_prob_von_mises_fisher_polar(x, mu, kappa):
-    logcdk = Logcdk.apply
-    return logcdk(mu.shape[-1], kappa) + kappa * (mu * x).sum(dim=-1)
+    if len(X.shape) == 1:
+        dot = (natural_param * X.to_dense()).sum(dim = -1)
+    else:
+        dot = sparse_dense_dot(X,natural_param)
+    return logcdk(natural_param.shape[-1], natural_param.norm(p=2, dim=-1)) + dot
 
 def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
     logcdk = Logcdk.apply
     return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1)
 
+def sparse_dense_mul(s, d):
+    i = s._indices()
+    v = s._values()
+    dv = d[i[0,:], i[1,:]]  # get values from relevant entries of dense matrix
+    return torch.sparse.FloatTensor(i, v * dv, s.size())
+
+def sparse_dense_dot(s, d):
+    return torch.sparse.sum(sparse_dense_mul(s, d),dim=1).to_dense()
 
 class SamJointDistributionWithStickDir:
     
@@ -35,7 +43,7 @@ class SamJointDistributionWithStickDir:
         pi = dist.StickBreakingTransform()(theta)
         mu = params['mu']
         avg = F.normalize(torch.matmul(pi,mu), p=2, dim=-1)
-        return (self.kappa1 * avg * self.x).sum(dim=-1).sum() \
+        return self.kappa1 * sparse_dense_dot(self.x,avg).sum() \
                 - logcdk(self.mu0.shape[-1], (self.kappa0 * self.mu0 + self.c0 * mu.sum(dim=0)).norm(p=2, dim=-1)) \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
                                         
