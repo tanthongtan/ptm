@@ -4,12 +4,15 @@ from sklearn.feature_extraction.text import TfidfTransformer
 import torch
 import sklearn.preprocessing as P
 
-def csr_to_torchsparse(x):
+def csr_to_torchsparse(x, gpu = False):
     coo = x.tocoo()    
-    values = torch.FloatTensor(coo.data)
+    values = torch.DoubleTensor(coo.data)
     indices = torch.LongTensor(np.vstack((coo.row, coo.col)))
-    size = torch.Size(coo.shape)    
-    return torch.sparse.FloatTensor(indices, values, size)
+    size = torch.Size(coo.shape)  
+    ret = torch.sparse.DoubleTensor(indices, values, size)
+    if gpu:
+        ret = ret.cuda()
+    return ret
 
 def load_data(dataset, use_tfidf, normalize, sublinear = False):
     data_tr = pickle.load(open("data/x_train_"+dataset+".p", "rb"))
@@ -32,8 +35,5 @@ def load_data(dataset, use_tfidf, normalize, sublinear = False):
     #--------------print the data dimentions--------------------------
     print('Dim Training Data',data_tr.shape)
     print('Dim Test Data',data_te.shape)
-    #--------------make tensor datasets-------------------------------
-    tensor_tr = csr_to_torchsparse(data_tr)
-    tensor_te = csr_to_torchsparse(data_te)
     
-    return (data_tr, data_te, tensor_tr, tensor_te, vocab, vocab_size, num_tr)
+    return (data_tr, data_te, vocab, vocab_size, num_tr)
