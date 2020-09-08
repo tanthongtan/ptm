@@ -3,6 +3,7 @@ import pickle
 from sklearn.feature_extraction.text import TfidfTransformer
 import torch
 import sklearn.preprocessing as P
+import scipy.sparse
 
 def csr_to_torchsparse(x, gpu = False):
     coo = x.tocoo()    
@@ -15,8 +16,8 @@ def csr_to_torchsparse(x, gpu = False):
     return ret
 
 def load_data(dataset, use_tfidf, normalize, sublinear = False):
-    data_tr = pickle.load(open("data/x_train_"+dataset+".p", "rb"))
-    data_te = pickle.load(open("data/x_test_"+dataset+".p", "rb"))
+    data_tr = scipy.sparse.load_npz("data/x_train_"+dataset+".npz")
+    data_te = scipy.sparse.load_npz("data/x_test_"+dataset+".npz")
     vocab = pickle.load(open("data/vocab_"+dataset+".p", "rb"))
     vocab_size = len(vocab)    
     data_tr=data_tr[data_tr.getnnz(1) > 0]
