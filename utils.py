@@ -12,6 +12,9 @@ import torch
 import distributions as D
 import torch.distributions as dist
 from statistics import mean
+import random
+import subprocess
+import os
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -36,17 +39,40 @@ def get_topic_uniqueness(top_words_idx_all_topics):
             cnt_inv_sum += 1.0 / word_cnt_dict[ind]
         uniquenesses.append(cnt_inv_sum / len(top_words_idx_all_topics[i]))
         
-    mean_tu = mean(uniquenesses)
+    return uniquenesses, mean(uniquenesses)
 
-    return uniquenesses, mean_tu
+def get_coherences(result):
+    coherences = []
+    for i, line in enumerate(result.strip().split('\n')):
+        if i == 0:
+            continue
+        else:
+            coherences.append(float(line.split()[1]))
+    return coherences, mean(coherences)
 
-def save_topics(topics, name):
-    with open('topics_'+name+'.txt', 'w') as file:
-        for i, line in enumerate(topics):
-            for word in line:
-                file.write(word+' ')
-            if i < (len(topics)-1):
-                file.write('\n')
+def print_summary(topics, method, dataset):
+    filename = str(random.randint(0,100000000))
+    save_topics(topics,filename)
+    result = subprocess.check_output(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], shell=True).decode()
+    coherences, mean_coherence = get_coherences(result)
+    uniquenesses, mean_uniqueness = get_topic_uniqueness(topics)
+    print("\nMethod  =", method)
+    print("Dataset =", dataset, "\n")
+    print(" NPMI      ", "TU        ", "Topic") 
+    for coherence, uniqueness, topic in zip(coherences, uniquenesses, topics):
+        print("{:8.5f} {:10.5f}   ".format(coherence, uniqueness), *topic)
+    print("\nMean NPMI =", mean_coherence)
+    print("Mean TU   =", mean_uniqueness)
+    os.remove(filename)
+
+def save_topics(topics, filename):
+    with open(filename, 'w') as file:
+        for topic in topics:
+            print(*topic,file=file)
+            
+def print_topics(topics):
+    for topic in topics:
+        print(*topic)
                 
 def get_topics(topic_matrix, vocab, n_top_words = 10):
     topics = []
