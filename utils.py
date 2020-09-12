@@ -57,6 +57,7 @@ def print_summary(topics, method, dataset):
     coherences, mean_coherence = get_coherences(result)
     uniquenesses, mean_uniqueness = get_topic_uniqueness(topics)
     print("\nMethod  =", method)
+    print("Number of topics =", len(topics))
     print("Dataset =", dataset, "\n")
     print(" NPMI      ", "TU        ", "Topic") 
     for coherence, uniqueness, topic in zip(coherences, uniquenesses, topics):
