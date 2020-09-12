@@ -53,7 +53,7 @@ def get_coherences(result):
 def print_summary(topics, method, dataset):
     filename = str(random.randint(0,100000000))
     save_topics(topics,filename)
-    result = subprocess.check_output(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], shell=True).decode()
+    result = subprocess.Popen(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].decode()
     coherences, mean_coherence = get_coherences(result)
     uniquenesses, mean_uniqueness = get_topic_uniqueness(topics)
     print("\nMethod  =", method)
