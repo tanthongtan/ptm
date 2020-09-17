@@ -15,6 +15,8 @@ from statistics import mean
 import random
 import subprocess
 import os
+import scipy.sparse
+import sklearn.metrics
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -93,3 +95,17 @@ def vmf_perplexity(tensor_te, mu_final, kappa_final, alpha, N=1000):
         log_likelihood = D.log_prob_von_mises_fisher(avg, doc_te)
         result += torch.logsumexp(log_likelihood, -1) - np.log(N)
     return - 1. / tensor_te.shape[0] * result
+
+def clustering_metrics_20news(pi):
+    data_tr = scipy.sparse.load_npz("data/x_train_20news.npz")
+    y_tr = np.load("data/y_train_20news.npy")
+    
+    chosen = data_tr.getnnz(1) > 0
+    y_tr = y_tr[chosen]
+    target = pi.argmax(axis=1)
+        
+    print("                NMI:   %.4f" % sklearn.metrics.normalized_mutual_info_score(y_tr,target))
+    print("Adjusted RAND index:   %.4f" % sklearn.metrics.adjusted_rand_score(y_tr,target))
+    print("        Adjusted MI:   %.4f" % sklearn.metrics.adjusted_mutual_info_score(y_tr,target))
+    print("            Fowlkes:   %.4f" % sklearn.metrics.fowlkes_mallows_score(y_tr,target))
+    print("        Homogeneity:   %.4f" % sklearn.metrics.homogeneity_score(y_tr, target))
