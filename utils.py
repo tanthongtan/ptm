@@ -65,7 +65,7 @@ def print_summary(topics, method, dataset):
     for coherence, uniqueness, topic in zip(coherences, uniquenesses, topics):
         print("{:8.5f} {:10.5f}   ".format(coherence, uniqueness), *topic)
     print("\nMean NPMI =", mean_coherence)
-    print("Mean TU   =", mean_uniqueness)
+    print("Mean TU   =", mean_uniqueness, "\n")
     os.remove(filename)
 
 def save_topics(topics, filename):
