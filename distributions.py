@@ -68,3 +68,27 @@ class VptmJointDistributionWithStickDirConjugatePrior:
         return log_prob_von_mises_fisher(avg, self.x).sum() \
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+                
+class BvmfmixJointDistributionWithStickDirConjugatePrior:
+    
+    def __init__(self, x, alpha, c, mu0, v):
+        self.x = x
+        self.alpha = alpha
+        self.c = c
+        self.mu0 = mu0
+        self.v = v
+        
+    def unnormalized_log_prob(self, params):
+        theta = params['theta']
+        pi = dist.StickBreakingTransform()(theta)
+        kappa = params['kappa']
+        mu = params['mu']
+        nat = kappa * mu
+        ll_sum = 0.
+        for x in self.x:
+            log_vmfs = log_prob_von_mises_fisher(nat, x)
+            log_pi = torch.log(pi)
+            ll_sum += torch.logsumexp(log_vmfs + log_pi, -1)
+        return ll_sum \
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
+                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
