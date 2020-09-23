@@ -14,6 +14,13 @@ def log_prob_von_mises_fisher(natural_param, X):
         dot = sparse_dense_dot(X,natural_param)
     return logcdk(natural_param.shape[-1], natural_param.norm(p=2, dim=-1)) + dot
 
+def log_prob_von_mises_fisher_mix(mu, kappa, pi, X):
+    logcdk = Logcdk.apply
+    dot = torch.sparse.mm(X, torch.transpose(kappa * mu, 0, 1))
+    log_norm = torch.transpose(logcdk(mu.shape[-1], kappa), 0, 1)
+    log_pi = torch.log(pi)
+    return torch.logsumexp(log_pi + log_norm + dot, -1)
+
 def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
     logcdk = Logcdk.apply
     return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1)
@@ -83,12 +90,6 @@ class BvmfmixJointDistributionWithStickDirConjugatePrior:
         pi = dist.StickBreakingTransform()(theta)
         kappa = params['kappa']
         mu = params['mu']
-        nat = kappa * mu
-        ll_sum = 0.
-        for x in self.x:
-            log_vmfs = log_prob_von_mises_fisher(nat, x)
-            log_pi = torch.log(pi)
-            ll_sum += torch.logsumexp(log_vmfs + log_pi, -1)
-        return ll_sum \
+        return log_prob_von_mises_fisher_mix(mu, kappa, pi, self.x).sum() \
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
