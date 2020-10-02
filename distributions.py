@@ -34,7 +34,7 @@ def sparse_dense_mul(s, d):
 def sparse_dense_dot(s, d):
     return torch.sparse.sum(sparse_dense_mul(s, d),dim=1).to_dense()
 
-class SamJointDistributionWithStickDir:
+class SamJointDistributionWithStickDirHyperprior:
     
     def __init__(self, x, alpha, c0, mu0, kappa0, kappa1):
         self.x = x
@@ -52,6 +52,24 @@ class SamJointDistributionWithStickDir:
         avg = F.normalize(torch.matmul(pi,mu), p=2, dim=-1)
         return self.kappa1 * sparse_dense_dot(self.x,avg).sum() \
                 - logcdk(self.mu0.shape[-1], (self.kappa0 * self.mu0 + self.c0 * mu.sum(dim=0)).norm(p=2, dim=-1)) \
+                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+                
+class SamJointDistributionWithStickDir:
+    
+    def __init__(self, x, alpha, c0, mu0, kappa0, kappa1):
+        self.x = x
+        self.alpha = alpha
+        self.c0 = c0
+        self.mu0 = mu0
+        self.kappa1 = kappa1
+        
+    def unnormalized_log_prob(self, params):
+        theta = params['theta']
+        pi = dist.StickBreakingTransform()(theta)
+        mu = params['mu']
+        avg = F.normalize(torch.matmul(pi,mu), p=2, dim=-1)
+        return self.kappa1 * sparse_dense_dot(self.x,avg).sum() \
+                + self.c0 * (self.mu0 * mu).sum(dim=-1).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
                                         
 class VptmJointDistributionWithStickDirConjugatePrior:
