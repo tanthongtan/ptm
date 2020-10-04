@@ -56,7 +56,7 @@ class SamJointDistributionWithStickDirHyperprior:
                 
 class SamJointDistributionWithStickDir:
     
-    def __init__(self, x, alpha, c0, mu0, kappa0, kappa1):
+    def __init__(self, x, alpha, c0, mu0, kappa1):
         self.x = x
         self.alpha = alpha
         self.c0 = c0
