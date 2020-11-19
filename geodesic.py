@@ -83,9 +83,10 @@ class SphericalGeodesic(Geodesic):
         return v
     
     def geodesic(self, x, v):
+        eta = self.eta / 2
         v_norm = v.norm(p=2, dim = -1).unsqueeze(-1)
-        cos_norm_t = torch.cos(v_norm * self.eta) 
-        sin_norm_t = torch.sin(v_norm * self.eta)
+        cos_norm_t = torch.cos(v_norm * eta) 
+        sin_norm_t = torch.sin(v_norm * eta)
         x_new = x * cos_norm_t + v / v_norm * sin_norm_t
         v_new = v * cos_norm_t - v_norm * x * sin_norm_t
         return (x_new, v_new)
@@ -96,7 +97,8 @@ class PositiveGeodesic(Geodesic):
         return v
     
     def geodesic(self, x, v):
-        x_new = x + self.eta * v
+        eta = self.eta / 2
+        x_new = x + eta * v
         v_new = v
         x_new[x_new<0] = -x_new[x_new<0]
         v_new[x_new<0] = -v_new[x_new<0]
@@ -108,6 +110,7 @@ class RnGeodesic(Geodesic):
         return v
     
     def geodesic(self, x, v):
-        x_new = x + self.eta * v
+        eta = self.eta / 2
+        x_new = x + eta * v
         v_new = v
         return (x_new, v_new)
