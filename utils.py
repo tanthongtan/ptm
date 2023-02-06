@@ -109,3 +109,23 @@ def clustering_metrics_20news(pi):
     print("        Adjusted MI:   %.4f" % sklearn.metrics.adjusted_mutual_info_score(y_tr,target))
     print("            Fowlkes:   %.4f" % sklearn.metrics.fowlkes_mallows_score(y_tr,target))
     print("        Homogeneity:   %.4f" % sklearn.metrics.homogeneity_score(y_tr, target))
+
+def get_invalid_topics(pi, kappa, threshold = None):
+    weights = pi*kappa.flatten()
+    
+    if threshold is None:
+        threshold = 1/pi.shape[1]
+
+    for i in range(weights.shape[0]):
+        weights[i] = weights[i]/np.sum(weights[i])
+    
+    invalids = []
+    for j in range(weights.shape[1]):
+        invalid = True
+        for i in range(weights.shape[0]):  
+            if weights[i][j]>=threshold:
+                invalid=False
+                break
+        if invalid:
+            invalids.append(j)
+    return invalids
