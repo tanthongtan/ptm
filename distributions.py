@@ -71,6 +71,29 @@ class SamJointDistributionWithStickDir:
         return self.kappa1 * sparse_dense_dot(self.x,avg).sum() \
                 + self.c0 * (self.mu0 * mu).sum(dim=-1).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+                
+
+class SamJointDistributionWithStickDirUnbiased:
+    
+    def __init__(self, x, alpha, c0, mu0, kappa1, idx):
+        self.x = x
+        self.alpha = alpha
+        self.c0 = c0
+        self.mu0 = mu0
+        self.kappa1 = kappa1
+        self.idx = idx
+        
+    def unnormalized_log_prob(self, params):
+        theta = params['theta']
+        pi = dist.StickBreakingTransform()(theta)
+        pi_chosen = pi[self.idx]
+        scaling_factor = theta.shape[0]/self.x.shape[0]
+        mu = params['mu']
+        avg = F.normalize(torch.matmul(pi_chosen,mu), p=2, dim=-1)
+        return scaling_factor * self.kappa1 * sparse_dense_dot(self.x,avg).sum() \
+                + self.c0 * (self.mu0 * mu).sum(dim=-1).sum() \
+                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+
                                         
 class VptmJointDistributionWithStickDirConjugatePrior:
     
