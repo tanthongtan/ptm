@@ -141,6 +141,37 @@ class VptmJointDistributionWithStickDirConjugatePriorUnbiased:
       return scaling_factor*log_prob_von_mises_fisher(avg, self.x).sum() \
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
               + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+
+class VptmJointDistributionWithStickDirLogKappaConjugatePriorUnbiased:
+
+    def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
+        self.x = x
+        self.alpha = alpha
+        self.c = c
+        self.mu0 = mu0
+        self.v = v
+        self.idx = idx
+        self.positive = positive
+
+    def unnormalized_log_prob(self, params):
+      theta = params['theta']
+      pi = dist.StickBreakingTransform()(theta)
+      pi_chosen = pi[self.idx]
+
+      scaling_factor = theta.shape[0]/self.x.shape[0]
+
+      iota = params['iota']
+      assert iota.shape == (pi.shape[-1],), f"Expected shape ({pi.shape[-1]},), got {iota.shape}"
+      kappa = dist.ExpTransform()(iota)
+      
+      mu = params['mu']
+      if self.positive == True:
+          mu = torch.abs(mu)
+      avg = torch.matmul(pi_chosen, kappa.reshape((-1, 1)) * mu)
+      return scaling_factor*log_prob_von_mises_fisher(avg, self.x).sum() \
+              + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
+              + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum() \
+              + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
     

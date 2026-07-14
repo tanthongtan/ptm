@@ -49,13 +49,14 @@ class GeodesicMonteCarlo:
         params_star = {name: param.clone() for name, param in params.items()}
         vs_star = {name: v.clone() for name, v in vs.items()}
         for _ in range(self.T):
+            for name, _ in params_star.items():
+                params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])
+                vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
             grads = grad(distribution.unnormalized_log_prob)(params_star)
-            for name, param_star in params_star.items():
-                params_star[name], vs_star[name] = geodesics[name].geodesic(param_star, vs_star[name])
+            for name, _ in params_star.items():                
+                vs_star[name] = geodesics[name].projection(params_star[name], vs_star[name] + grads[name]*geodesics[name].eta + (torch.randn_like(params_star[name]) * ((2*geodesics[name].c*geodesics[name].eta)**0.5)))
                 vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
-                vs_star[name] = geodesics[name].projection(param_star, vs_star[name] + grads[name]*geodesics[name].eta+dist.MultivariateNormal(torch.zeros(param_star.shape[-1]), 2*geodesics[name].c*geodesics[name].eta*torch.eye(param_star.shape[-1])).sample([param_star.shape[0]]))
-                vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
-                params_star[name], vs_star[name] = geodesics[name].geodesic(param_star, vs_star[name])                
+                params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])                
         return params_star, vs_star
 
 class Geodesic:
