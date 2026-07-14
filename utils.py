@@ -91,7 +91,7 @@ def vmf_perplexity(tensor_te, mu_final, kappa_final, alpha, N=1000):
         if isinstance(kappa_final, Number):
             avg = kappa_final * F.normalize(torch.matmul(prior_pi,mu_final), p=2, dim=-1)
         else:
-            avg = torch.matmul(prior_pi, kappa_final * mu_final)
+            avg = torch.matmul(prior_pi, kappa_final.reshape((-1, 1)) * mu_final)
         log_likelihood = D.log_prob_von_mises_fisher(avg, doc_te)
         result += torch.logsumexp(log_likelihood, -1) - np.log(N)
     return - 1. / tensor_te.shape[0] * result
