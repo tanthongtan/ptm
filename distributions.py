@@ -29,6 +29,17 @@ def log_prob_von_mises_fisher_efficient(pi, kappa, mu, X):
     dot = (pi * doc_topic_matmul).sum(dim=-1)
     return logcdk(mu.shape[-1], norm) + dot
 
+def log_prob_von_mises_fisher_single_fixed_kappa_efficient(pi, kappa, mu, X):        
+    #get norm
+    gram_matrix = torch.mm(mu, mu.T)
+    squared_norm = (torch.mm(pi, gram_matrix) * pi).sum(dim=-1)
+    norm = squared_norm ** 0.5
+
+    #get dot
+    doc_topic_matmul = torch.mm(X, mu.T)
+    dot = (pi * doc_topic_matmul).sum(dim=-1)
+    return kappa * dot / norm
+
 def log_prob_von_mises_fisher_mix(mu, kappa, pi, X):
     logcdk = Logcdk.apply
     dot = torch.sparse.mm(X, torch.transpose(kappa * mu, 0, 1))
@@ -104,8 +115,7 @@ class SamJointDistributionWithStickDirUnbiased:
         pi_chosen = pi[self.idx]
         scaling_factor = theta.shape[0]/self.x.shape[0]
         mu = params['mu']
-        avg = F.normalize(torch.matmul(pi_chosen,mu), p=2, dim=-1)
-        return scaling_factor * self.kappa1 * sparse_dense_dot(self.x,avg).sum() \
+        return scaling_factor * log_prob_von_mises_fisher_single_fixed_kappa_efficient(pi=pi_chosen, kappa=self.kappa1, mu=mu, X=self.x).sum() \
                 + self.c0 * (self.mu0 * mu).sum(dim=-1).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
 
