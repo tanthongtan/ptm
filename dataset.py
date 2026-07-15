@@ -7,10 +7,10 @@ import scipy.sparse
 
 def csr_to_torchsparse(x, gpu = False):
     coo = x.tocoo()    
-    values = torch.FloatTensor(coo.data)
+    values = torch.DoubleTensor(coo.data)
     indices = torch.LongTensor(np.vstack((coo.row, coo.col)))
     size = torch.Size(coo.shape)  
-    ret = torch.sparse.FloatTensor(indices, values, size)
+    ret = torch.sparse.DoubleTensor(indices, values, size)
     if gpu:
         ret = ret.cuda()
     return ret
