@@ -6,11 +6,12 @@ import sklearn.preprocessing as P
 import scipy.sparse
 
 def csr_to_torchsparse(x, gpu = False):
-    coo = x.tocoo()    
-    values = torch.DoubleTensor(coo.data)
-    indices = torch.LongTensor(np.vstack((coo.row, coo.col)))
-    size = torch.Size(coo.shape)  
-    ret = torch.sparse.DoubleTensor(indices, values, size)
+    assert scipy.sparse.isspmatrix_csr(x), "x must be a SciPy CSR matrix"
+    crow_indices = torch.LongTensor(x.indptr) 
+    col_indices = torch.LongTensor(x.indices)
+    values = torch.DoubleTensor(x.data)
+    size = torch.Size(x.shape)  
+    ret = torch.sparse_csr_tensor(crow_indices=crow_indices, col_indices=col_indices, values=values, size=size)
     if gpu:
         ret = ret.cuda()
     return ret
