@@ -14,6 +14,21 @@ def log_prob_von_mises_fisher(natural_param, X):
         dot = sparse_dense_dot(X,natural_param)
     return logcdk(natural_param.shape[-1], natural_param.norm(p=2, dim=-1)) + dot
 
+def log_prob_von_mises_fisher_efficient(pi, kappa, mu, X):
+    logcdk = Logcdk.apply
+    
+    topic_natural_params = kappa.reshape((-1, 1)) * mu
+    
+    #get norm
+    gram_matrix = torch.mm(topic_natural_params, topic_natural_params.T)
+    squared_norm = (torch.mm(pi, gram_matrix) * pi).sum(dim=-1)
+    norm = squared_norm ** 0.5
+
+    #get dot
+    doc_topic_matmul = torch.mm(X, topic_natural_params.T)
+    dot = (pi * doc_topic_matmul).sum(dim=-1)
+    return logcdk(mu.shape[-1], norm) + dot
+
 def log_prob_von_mises_fisher_mix(mu, kappa, pi, X):
     logcdk = Logcdk.apply
     dot = torch.sparse.mm(X, torch.transpose(kappa * mu, 0, 1))
@@ -167,8 +182,8 @@ class VptmJointDistributionWithStickDirLogKappaConjugatePriorUnbiased:
       mu = params['mu']
       if self.positive == True:
           mu = torch.abs(mu)
-      avg = torch.matmul(pi_chosen, kappa.reshape((-1, 1)) * mu)
-      return scaling_factor*log_prob_von_mises_fisher(avg, self.x).sum() \
+          
+      return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
               + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum() \
               + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
