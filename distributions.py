@@ -157,13 +157,17 @@ class VptmJointDistributionWithStickDirConjugatePriorUnbiased:
       theta = params['theta']
       pi = dist.StickBreakingTransform()(theta)
       pi_chosen = pi[self.idx]
+
       scaling_factor = theta.shape[0]/self.x.shape[0]
+
       kappa = params['kappa']
+      assert kappa.shape == (pi.shape[-1],), f"Expected shape ({pi.shape[-1]},), got {kappa.shape}"
+
       mu = params['mu']
       if self.positive == True:
           mu = torch.abs(mu)
-      avg = torch.matmul(pi_chosen, kappa * mu)
-      return scaling_factor*log_prob_von_mises_fisher(avg, self.x).sum() \
+
+      return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
               + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
 

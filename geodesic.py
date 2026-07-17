@@ -101,8 +101,9 @@ class PositiveGeodesic(Geodesic):
         eta = self.eta / 2
         x_new = x + eta * v
         v_new = v
-        x_new[x_new<0] = -x_new[x_new<0]
-        v_new[x_new<0] = -v_new[x_new<0]
+        negative_indices = x_new < 0
+        x_new[negative_indices] = -x_new[negative_indices]
+        v_new[negative_indices] = -v_new[negative_indices]
         return (x_new, v_new)
     
 class RnGeodesic(Geodesic):
