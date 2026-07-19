@@ -2,9 +2,13 @@ import torch
 from lcdk import Logcdk
 import torch.nn.functional as F
 import torch.distributions as dist
+import math
 
 def log_prob_stickbreaking_dirichlet(alpha, theta, pi):
     return dist.Dirichlet(alpha).log_prob(pi) - dist.StickBreakingTransform().inv.log_abs_det_jacobian(pi, theta)
+
+def log_prob_ilr_dirichlet(alpha, theta, pi):
+    return dist.Dirichlet(alpha).log_prob(pi) + HelmertILRTransform().inv.log_abs_det_jacobian(theta, pi)
 
 def log_prob_von_mises_fisher(natural_param, X):
     logcdk = Logcdk.apply
@@ -155,7 +159,7 @@ class VptmJointDistributionWithStickDirConjugatePriorUnbiased:
 
     def unnormalized_log_prob(self, params):
       theta = params['theta']
-      pi = dist.StickBreakingTransform()(theta)
+      pi = HelmertILRTransform().inv(theta)
       pi_chosen = pi[self.idx]
 
       scaling_factor = theta.shape[0]/self.x.shape[0]
@@ -169,7 +173,7 @@ class VptmJointDistributionWithStickDirConjugatePriorUnbiased:
 
       return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
-              + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+              + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum()
 
 class VptmJointDistributionWithStickDirLogKappaConjugatePriorUnbiased:
 
@@ -184,7 +188,7 @@ class VptmJointDistributionWithStickDirLogKappaConjugatePriorUnbiased:
 
     def unnormalized_log_prob(self, params):
       theta = params['theta']
-      pi = dist.StickBreakingTransform()(theta)
+      pi = HelmertILRTransform().inv(theta)
       pi_chosen = pi[self.idx]
 
       scaling_factor = theta.shape[0]/self.x.shape[0]
@@ -199,7 +203,7 @@ class VptmJointDistributionWithStickDirLogKappaConjugatePriorUnbiased:
           
       return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
-              + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum() \
+              + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum() \
               + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
@@ -219,3 +223,47 @@ class BvmfmixJointDistributionWithStickDirConjugatePrior:
         return log_prob_von_mises_fisher_mix(mu, kappa, pi, self.x).sum() \
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+
+
+#Transforms
+
+class HelmertILRTransform(dist.transforms.Transform):
+
+    domain = dist.constraints.simplex
+    codomain = dist.constraints.real_vector
+    bijective = True
+
+    def __eq__(self, other):
+        return isinstance(other, HelmertILRTransform)
+
+    @staticmethod
+    def _get_helmert_coefs(k, ref):
+        n = torch.arange(1, k, dtype=ref.dtype, device=ref.device)
+        helmert_coefs = torch.rsqrt(n * (n+1))
+        return n, helmert_coefs
+    
+    def _call(self, x):
+        n, helmert_coefs = self._get_helmert_coefs(x.shape[-1], x)
+        logx = x.log()
+        cumsum_logx = logx[..., :-1].cumsum(-1)
+        return (cumsum_logx - n * logx[..., 1:]) * helmert_coefs
+
+    def _inverse(self, y):
+        n, helmert_coefs = self._get_helmert_coefs(y.shape[-1]+1, y)
+        helmert = y * helmert_coefs
+        sum_to_zero = F.pad(helmert.flip(-1).cumsum(-1).flip(-1), [0,1]) - F.pad(n * helmert, [1, 0])
+        return torch.softmax(sum_to_zero, dim=-1)
+
+    def log_abs_det_jacobian(self, x, y):
+        return - x.log().sum(-1) - 0.5 * math.log(x.shape[-1])
+
+    def forward_shape(self, shape):
+        if len(shape) < 1:
+            raise ValueError("Too few dimensions on input")
+        return shape[:-1] + (shape[-1] - 1,)
+
+    def inverse_shape(self, shape):
+        if len(shape) < 1:
+            raise ValueError("Too few dimensions on input")
+        return shape[:-1] + (shape[-1] + 1,)
+
