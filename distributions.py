@@ -146,7 +146,7 @@ class VptmJointDistributionWithStickDirConjugatePrior:
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
                 + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
     
-class VptmJointDistributionWithStickDirConjugatePriorUnbiased:
+class VptmJointDistributionWithILRDirConjugatePriorUnbiased:
 
     def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
         self.x = x
@@ -175,7 +175,7 @@ class VptmJointDistributionWithStickDirConjugatePriorUnbiased:
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
               + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum()
 
-class VptmJointDistributionWithStickDirLogKappaConjugatePriorUnbiased:
+class VptmJointDistributionWithILRDirLogKappaConjugatePriorUnbiased:
 
     def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
         self.x = x
