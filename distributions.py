@@ -1,5 +1,5 @@
 import torch
-from lcdk import Logcdk
+from lcdk import Logcdk, ratio
 import torch.nn.functional as F
 import torch.distributions as dist
 import math
@@ -205,6 +205,40 @@ class VptmJointDistributionWithILRDirLogKappaConjugatePriorUnbiased:
               + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
               + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum() \
               + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
+
+class VptmJointDistributionWithILRDirLogKappaMRLWeightedConjugatePriorUnbiased:
+
+    def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
+        self.x = x
+        self.alpha = alpha
+        self.c = c
+        self.mu0 = mu0
+        self.v = v
+        self.idx = idx
+        self.positive = positive
+
+    def unnormalized_log_prob(self, params):
+        theta = params['theta']
+        pi = HelmertILRTransform().inv(theta)
+        pi_chosen = pi[self.idx]
+
+        scaling_factor = theta.shape[0]/self.x.shape[0]
+
+        iota = params['iota']
+        assert iota.shape == (pi.shape[-1],), f"Expected shape ({pi.shape[-1]},), got {iota.shape}"
+        kappa = dist.ExpTransform()(iota)
+        
+        mu = params['mu']
+        if self.positive == True:
+            mu = torch.abs(mu)
+
+        mrl = ratio(mu.shape[-1]/2, kappa)
+            
+        return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
+                + torch.log(mrl).sum() \
+                + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum() \
+                + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
     
