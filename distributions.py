@@ -4,21 +4,19 @@ import torch.nn.functional as F
 import torch.distributions as dist
 import math
 
-def log_prob_stickbreaking_dirichlet(alpha, theta, pi):
-    return dist.Dirichlet(alpha).log_prob(pi) - dist.StickBreakingTransform().inv.log_abs_det_jacobian(pi, theta)
+def log_prob_exponential_log_a(b, a_rn, a):
+    return dist.Exponential(b).log_prob(a) + dist.ExpTransform().log_abs_det_jacobian(a_rn, a)
 
-def log_prob_ilr_dirichlet(alpha, theta, pi):
-    return dist.Dirichlet(alpha).log_prob(pi) + HelmertILRTransform().inv.log_abs_det_jacobian(theta, pi)
+def log_prob_dirichlet_ilr_pi(alpha, pi_rn, pi):
+    return dist.Dirichlet(alpha).log_prob(pi) + HelmertILRTransform().inv.log_abs_det_jacobian(pi_rn, pi)
 
-def log_prob_von_mises_fisher(natural_param, X):
+def log_prob_von_mises_fisher_single_datapoint(natural_param, X):
     logcdk = Logcdk.apply
-    if len(X.shape) == 1:
-        dot = (natural_param * X.to_dense()).sum(dim = -1)
-    else:
-        dot = sparse_dense_dot(X,natural_param)
+    assert len(X.shape) == 1, "X has to be a single datapoint."
+    dot = (natural_param * X.to_dense()).sum(dim = -1)
     return logcdk(natural_param.shape[-1], natural_param.norm(p=2, dim=-1)) + dot
 
-def log_prob_von_mises_fisher_efficient(pi, kappa, mu, X):
+def log_prob_vptm_likelihood(pi, kappa, mu, X):
     logcdk = Logcdk.apply
     
     topic_natural_params = kappa.reshape((-1, 1)) * mu
@@ -36,7 +34,7 @@ def log_prob_von_mises_fisher_efficient(pi, kappa, mu, X):
     dot = (pi * doc_topic_matmul).sum(dim=-1)
     return logcdk(mu.shape[-1], norm) + dot
 
-def log_prob_von_mises_fisher_single_fixed_kappa_efficient(pi, kappa, mu, X):        
+def log_prob_sam_likelihood(pi, kappa, mu, X):        
     #get norm
     gram_matrix = torch.mm(mu, mu.T)
     squared_norm = (torch.mm(pi, gram_matrix) * pi).sum(dim=-1)
@@ -47,25 +45,20 @@ def log_prob_von_mises_fisher_single_fixed_kappa_efficient(pi, kappa, mu, X):
     dot = (pi * doc_topic_matmul).sum(dim=-1)
     return kappa * dot / norm
 
-def log_prob_von_mises_fisher_mix(mu, kappa, pi, X):
+def log_prob_bvmfmix_likelihood(mu, kappa, pi, X):
     logcdk = Logcdk.apply
-    dot = torch.sparse.mm(X, torch.transpose(kappa * mu, 0, 1))
-    log_norm = torch.transpose(logcdk(mu.shape[-1], kappa), 0, 1)
+
+    topic_natural_params = kappa.reshape((-1, 1)) * mu
+    dot = torch.mm(X, topic_natural_params.T)
+    
+    log_norm = logcdk(mu.shape[-1], kappa)
     log_pi = torch.log(pi)
     return torch.logsumexp(log_pi + log_norm + dot, -1)
 
-def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
+def log_prob_vmf_conjugate_prior_log_kappa(c, v, mu0, mu, kappa_rn, kappa):
     logcdk = Logcdk.apply
-    return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1)
-
-def sparse_dense_mul(s, d):
-    i = s._indices()
-    v = s._values()
-    dv = d[i[0,:], i[1,:]]  # get values from relevant entries of dense matrix
-    return torch.sparse.FloatTensor(i, v * dv, s.size())
-
-def sparse_dense_dot(s, d):
-    return torch.sparse.sum(sparse_dense_mul(s, d),dim=1).to_dense()
+    return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1) \
+        + dist.ExpTransform().log_abs_det_jacobian(kappa_rn, kappa)
 
                 
 
@@ -80,17 +73,18 @@ class SamJointDistributionWithStickDirUnbiased:
         self.idx = idx
         
     def unnormalized_log_prob(self, params):
-        theta = params['theta']
-        pi = dist.StickBreakingTransform()(theta)
+        pi_rn = params['pi_rn']
+        pi = HelmertILRTransform().inv(pi_rn)
         pi_chosen = pi[self.idx]
-        scaling_factor = theta.shape[0]/self.x.shape[0]
+        scaling_factor = pi_rn.shape[0]/self.x.shape[0]
         mu = params['mu']
-        return scaling_factor * log_prob_von_mises_fisher_single_fixed_kappa_efficient(pi=pi_chosen, kappa=self.kappa1, mu=mu, X=self.x).sum() \
+        return scaling_factor * log_prob_sam_likelihood(pi=pi_chosen, kappa=self.kappa1, mu=mu, X=self.x).sum() \
                 + self.c0 * (self.mu0 * mu).sum(dim=-1).sum() \
-                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum()
 
     
-class VptmJointDistributionWithILRDirConjugatePriorUnbiased:
+
+class VptmJointDistribution:
 
     def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
         self.x = x
@@ -102,105 +96,91 @@ class VptmJointDistributionWithILRDirConjugatePriorUnbiased:
         self.positive = positive
 
     def unnormalized_log_prob(self, params):
-      theta = params['theta']
-      pi = HelmertILRTransform().inv(theta)
-      pi_chosen = pi[self.idx]
-
-      scaling_factor = theta.shape[0]/self.x.shape[0]
-
-      kappa = params['kappa']
-      assert kappa.shape == (pi.shape[-1],), f"Expected shape ({pi.shape[-1]},), got {kappa.shape}"
-
-      mu = params['mu']
-      if self.positive == True:
-          mu = torch.abs(mu)
-
-      return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
-              + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
-              + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum()
-
-class VptmJointDistributionWithILRDirLogKappaConjugatePriorUnbiased:
-
-    def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
-        self.x = x
-        self.alpha = alpha
-        self.c = c
-        self.mu0 = mu0
-        self.v = v
-        self.idx = idx
-        self.positive = positive
-
-    def unnormalized_log_prob(self, params):
-        theta = params['theta']
-        pi = HelmertILRTransform().inv(theta)
+        pi_rn = params['pi_rn']
+        pi = HelmertILRTransform().inv(pi_rn)
         pi_chosen = pi[self.idx]
 
-        scaling_factor = theta.shape[0]/self.x.shape[0]
+        scaling_factor = pi_rn.shape[0]/self.x.shape[0]
         
         mu = params['mu']
         if self.positive == True:
             mu = torch.abs(mu)
 
-        iota = params['iota']
-        assert iota.shape == (mu.shape[0],), f"Expected shape ({mu.shape[0]},), got {iota.shape}"
-        kappa = dist.ExpTransform()(iota)
+        kappa_rn = params['kappa_rn']
+        assert kappa_rn.shape == (mu.shape[0],), f"Expected shape ({mu.shape[0]},), got {kappa_rn.shape}"
+        kappa = dist.ExpTransform()(kappa_rn)
             
-        return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
-                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
-                + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum() \
-                + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
+        return scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
+                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum() \
+                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum() 
 
-class VptmJointDistributionWithILRDirLogKappaMRLWeightedConjugatePriorUnbiased:
+class VptmJointDistributionHyperprior:
 
-    def __init__(self, x, alpha, c, mu0, v, idx, positive = False):
+    def __init__(self, x, alpha, c, mu0, v, b, idx, positive = False):
         self.x = x
         self.alpha = alpha
         self.c = c
         self.mu0 = mu0
         self.v = v
         self.idx = idx
+        self.b = b
         self.positive = positive
 
     def unnormalized_log_prob(self, params):
-        theta = params['theta']
-        pi = HelmertILRTransform().inv(theta)
+        #dirchlet hyperprior
+        rho_rn = params['rho_rn']
+        rho = HelmertILRTransform().inv(rho_rn)
+
+        a_rn = params['a_rn']
+        assert a_rn.ndim == 0, "a_rn has to be a scalar."
+        a = dist.ExpTransform()(a_rn)
+
+        pi_rn = params['pi_rn']
+        pi = HelmertILRTransform().inv(pi_rn)
         pi_chosen = pi[self.idx]
 
-        scaling_factor = theta.shape[0]/self.x.shape[0]
-
-        iota = params['iota']
-        assert iota.shape == (pi.shape[-1],), f"Expected shape ({pi.shape[-1]},), got {iota.shape}"
-        kappa = dist.ExpTransform()(iota)
+        scaling_factor = pi_rn.shape[0]/self.x.shape[0]
         
         mu = params['mu']
         if self.positive == True:
             mu = torch.abs(mu)
 
-        mrl = ratio(mu.shape[-1]/2, kappa)
+        kappa_rn = params['kappa_rn']
+        assert kappa_rn.shape == (mu.shape[0],), f"Expected shape ({mu.shape[0]},), got {kappa_rn.shape}"
+        kappa = dist.ExpTransform()(kappa_rn)
             
-        return scaling_factor*log_prob_von_mises_fisher_efficient(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
-                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
-                + torch.log(mrl).sum() \
-                + log_prob_ilr_dirichlet(self.alpha, theta, pi).sum() \
-                + dist.ExpTransform().log_abs_det_jacobian(iota, kappa).sum()
+        return scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
+                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum() \
+                + log_prob_dirichlet_ilr_pi(a * rho, pi_rn, pi).sum() \
+                + log_prob_dirichlet_ilr_pi(self.alpha, rho_rn, rho).sum() \
+                + log_prob_exponential_log_a(self.b, a_rn, a)
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
     
-    def __init__(self, x, alpha, c, mu0, v):
+    def __init__(self, x, alpha, c, mu0, v, N):
         self.x = x
         self.alpha = alpha
         self.c = c
         self.mu0 = mu0
         self.v = v
+        self.N = N
         
     def unnormalized_log_prob(self, params):
-        theta = params['theta']
-        pi = dist.StickBreakingTransform()(theta)
-        kappa = params['kappa']
+        pi_rn = params['pi_rn']
+        pi = HelmertILRTransform().inv(pi_rn)
+        assert pi.ndim == 1, "pi has to be a 1D vector"
+
+        scaling_factor = self.N/self.x.shape[0]
+
         mu = params['mu']
-        return log_prob_von_mises_fisher_mix(mu, kappa, pi, self.x).sum() \
-                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum() \
-                + log_prob_stickbreaking_dirichlet(self.alpha, theta, pi).sum()
+
+        kappa_rn = params['kappa_rn']
+        assert kappa_rn.shape == (mu.shape[0],), f"Expected shape ({mu.shape[0]},), got {kappa_rn.shape}"
+        kappa = dist.ExpTransform()(kappa_rn)
+
+        return scaling_factor * log_prob_bvmfmix_likelihood(mu, kappa, pi, self.x).sum() \
+                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum() \
+                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum()
 
 
 #Transforms

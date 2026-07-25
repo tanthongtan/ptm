@@ -16,60 +16,31 @@ def grad(f):
         return {name: param_.grad for name, param_ in params_.items()}
     return result
     
-class GeodesicMonteCarlo:
     
-    def __init__(self, T = 20):
-        self.T = T
-    
-    def transition(self, params, geodesics, distribution):
-        vs = {}
-        for name, param in params.items():
-            vs[name] = dist.MultivariateNormal(torch.zeros(param.shape[-1]), torch.eye(param.shape[-1])).sample([param.shape[0]])
-            vs[name] = geodesics[name].projection(param, vs[name])
-        h = distribution.unnormalized_log_prob(params) - 0.5 * torch.cat([v.flatten() for v in vs.values()]).norm()**2
-        params_star = {name: param.clone() for name, param in params.items()}
-        for _ in range(self.T):
-            grads = grad(distribution.unnormalized_log_prob)(params_star)
-            for name, param_star in params_star.items():
-                vs[name] = vs[name] + geodesics[name].eta/2.0 * grads[name]
-                vs[name] = geodesics[name].projection(param_star, vs[name])
-                params_star[name], vs[name] = geodesics[name].geodesic(param_star, vs[name])
-            grads = grad(distribution.unnormalized_log_prob)(params_star)
-            for name, param_star in params_star.items():
-                vs[name] = vs[name] + geodesics[name].eta/2.0 * grads[name]
-                vs[name] = geodesics[name].projection(param_star, vs[name])
-        h_star = distribution.unnormalized_log_prob(params_star) - 0.5 * torch.cat([v.flatten() for v in vs.values()]).norm()**2
-        u = torch.rand_like(h_star)
-        accept_prob = torch.exp(h_star - h)
-        for name, param in params.items():
-            params_star[name][u >= accept_prob, :] = param[u >= accept_prob, :]
-        return params_star, accept_prob
-    
-    def stochastic_transition(self, params, vs, geodesics, distribution):
-        params_star = {name: param.clone() for name, param in params.items()}
-        vs_star = {name: v.clone() for name, v in vs.items()}
-        for _ in range(self.T):
-            for name, _ in params_star.items():
-                params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])
-                vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
-            grads = grad(distribution.unnormalized_log_prob)(params_star)
-            for name, _ in params_star.items():                
-                vs_star[name] = geodesics[name].projection(params_star[name], vs_star[name] + grads[name]*geodesics[name].eta + (torch.randn_like(params_star[name]) * ((2*geodesics[name].c*geodesics[name].eta)**0.5)))
-                vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].eta/2) * vs_star[name]
-                params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])                
-        return params_star, vs_star
+def sggmc_transition(params, vs, geodesics, distribution):
+    params_star = {name: param.clone() for name, param in params.items()}
+    vs_star = {name: v.clone() for name, v in vs.items()}
+    for name, _ in params_star.items():
+        params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])
+        vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
+    grads = grad(distribution.unnormalized_log_prob)(params_star)
+    for name, _ in params_star.items():                
+        vs_star[name] = geodesics[name].projection(params_star[name], vs_star[name] + grads[name]*geodesics[name].epsilon + (torch.randn_like(params_star[name]) * ((2*geodesics[name].c*geodesics[name].epsilon)**0.5)))
+        vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
+        params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])                
+    return params_star, vs_star
 
 class Geodesic:
     
-    def __init__(self, eta = 1e-2, c=None, gamma=None, rho=None, N=None):
-        if eta is not None:
-            self.eta = eta
+    def __init__(self, epsilon = None, lambda_param = 1, c=None, gamma=None, zeta=None, N=None):
+        if epsilon is not None:
+            self.epsilon = epsilon
         else:
-            self.eta = np.sqrt(gamma/N)
+            self.epsilon = lambda_param * np.sqrt(gamma/N)
         if c is not None:
             self.c = c
-        elif rho is not None:
-            self.c = rho/self.eta
+        elif zeta is not None:
+            self.c = zeta/self.epsilon
         
     def projection(self, x, v):
         raise NotImplementedError
@@ -84,10 +55,10 @@ class SphericalGeodesic(Geodesic):
         return v
     
     def geodesic(self, x, v):
-        eta = self.eta / 2
+        epsilon = self.epsilon / 2
         v_norm = v.norm(p=2, dim = -1).unsqueeze(-1)
-        cos_norm_t = torch.cos(v_norm * eta) 
-        sin_norm_t = torch.sin(v_norm * eta)
+        cos_norm_t = torch.cos(v_norm * epsilon) 
+        sin_norm_t = torch.sin(v_norm * epsilon)
         x_new = x * cos_norm_t + v / v_norm * sin_norm_t
         v_new = v * cos_norm_t - v_norm * x * sin_norm_t
         return (x_new, v_new)
@@ -98,8 +69,8 @@ class PositiveGeodesic(Geodesic):
         return v
     
     def geodesic(self, x, v):
-        eta = self.eta / 2
-        x_new = x + eta * v
+        epsilon = self.epsilon / 2
+        x_new = x + epsilon * v
         v_new = v
         negative_indices = x_new < 0
         x_new[negative_indices] = -x_new[negative_indices]
@@ -112,7 +83,7 @@ class RnGeodesic(Geodesic):
         return v
     
     def geodesic(self, x, v):
-        eta = self.eta / 2
-        x_new = x + eta * v
+        epsilon = self.epsilon / 2
+        x_new = x + epsilon * v
         v_new = v
         return (x_new, v_new)
