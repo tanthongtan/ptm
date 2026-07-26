@@ -4,6 +4,39 @@ import torch.nn.functional as F
 import torch.distributions as dist
 import math
 
+#initialization
+
+class Initialization:
+
+    def __init__(self, num_topic, num_tr, vocab_size, null_component=True):
+        self.num_topic = num_topic
+        self.num_tr = num_tr
+        self.vocab_size = vocab_size
+        self.num_components = num_topic + 1 if null_component else num_topic
+
+    def get_initial_mu(self):
+        return F.normalize(torch.randn(self.num_topic, self.vocab_size), p=2, dim=-1)
+
+    def get_initial_pi_rn(self, initial_alpha = 10.0):
+        init_pi = dist.Dirichlet(torch.full((self.num_components,), initial_alpha)).sample([self.num_tr])
+        return HelmertILRTransform()(init_pi)
+
+    def get_initial_rho_rn(self, initial_alpha = 100.0):
+        init_rho = dist.Dirichlet(torch.full((self.num_components,), initial_alpha)).sample()
+        return HelmertILRTransform()(init_rho)
+
+    def get_initial_a_rn(self, conventional_alpha = 0.5):
+        a = conventional_alpha * (self.num_components + torch.randn(()))
+        return dist.ExpTransform().inv(a)
+
+    def get_initial_kappa_rn(self, initial_mrl = 0.5):
+        random_mrl = torch.randn(self.num_topic) / 100 + initial_mrl
+        random_mrl = random_mrl.clip(min=0.01, max=0.99)
+        kappa_approx = (random_mrl * (self.vocab_size - random_mrl ** 2)) / (1 - random_mrl ** 2)
+        return dist.ExpTransform().inv(kappa_approx)
+
+#probability densities
+
 def log_prob_exponential_log_a(b, a_rn, a):
     return dist.Exponential(b).log_prob(a) + dist.ExpTransform().log_abs_det_jacobian(a_rn, a)
 
