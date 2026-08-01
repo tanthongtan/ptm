@@ -39,3 +39,15 @@ def load_data(dataset, use_tfidf, normalize, sublinear = False):
     print('Dim Test Data',data_te.shape)
     
     return (data_tr, data_te, vocab, vocab_size, num_tr)
+
+
+def get_block_diag_data_batches_all_chains(data_tr, S, M, gpu = False):
+    num_tr = data_tr.shape[0]
+    indices = [np.random.permutation(num_tr)[:S] for x in range(M)]
+    all_chains_batches = [data_tr[indices[x]] for x in range(M)]
+    scipy_block_diag = scipy.sparse.block_diag(all_chains_batches, format="csr")
+
+    torch_indices = torch.LongTensor(indices)
+    if gpu:
+        torch_indices = torch_indices.cuda()
+    return csr_to_torchsparse(scipy_block_diag, gpu), torch_indices
