@@ -43,7 +43,7 @@ def load_data(dataset, use_tfidf, normalize, sublinear = False):
 
 def get_block_diag_data_batches_all_chains(data_tr, S, M, gpu = False):
     num_tr = data_tr.shape[0]
-    indices = [np.random.permutation(num_tr)[:S] for x in range(M)]
+    indices = np.array([np.random.permutation(num_tr)[:S] for x in range(M)])
     all_chains_batches = [data_tr[indices[x]] for x in range(M)]
     scipy_block_diag = scipy.sparse.block_diag(all_chains_batches, format="csr")
 
