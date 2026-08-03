@@ -28,6 +28,12 @@ class Initialization:
         kappa_approx = (random_mrl * (self.vocab_size - random_mrl ** 2)) / (1 - random_mrl ** 2)
         return dist.ExpTransform().inv(kappa_approx)
 
+    def get_initial_kappa(self, initial_mrl = 0.5):
+        random_mrl = torch.randn(self.M, self.num_topic) / 100 + initial_mrl
+        random_mrl = random_mrl.clip(min=0.01, max=0.99)
+        kappa_approx = (random_mrl * (self.vocab_size - random_mrl ** 2)) / (1 - random_mrl ** 2)
+        return kappa_approx
+
 #probability densities
 
 def log_prob_exponential_log_a(b, a_rn, a):
@@ -90,6 +96,10 @@ def log_prob_vmf_conjugate_prior_log_kappa(c, v, mu0, mu, kappa_rn, kappa):
     return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1) \
         + dist.ExpTransform().log_abs_det_jacobian(kappa_rn, kappa)
 
+def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
+    logcdk = Logcdk.apply
+    return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1) 
+
 
 class JointDistribution:
 
@@ -142,8 +152,43 @@ class VptmJointDistribution(JointDistribution):
         self.v = v
         self.positive = positive
 
+    def unnormalized_log_prob_per_chain(self, params):
+        if self.stochastic_gradient:
+            self.x, self.idx = get_block_diag_data_batches_all_chains(data_tr=self.data_tr, S=self.S, M=self.M, gpu=self.gpu)
+
+        pi_rn = params['pi_rn']
+        pi = HelmertILRTransform().inv(pi_rn)
+        chain_indices = torch.arange(self.M, dtype=torch.long, device=pi.device).unsqueeze(-1)
+        pi_chosen = pi[chain_indices, self.idx]
+        
+        mu = params['mu']
+        if self.positive == True:
+            mu = torch.abs(mu)
+
+        kappa = params['kappa']
+        assert kappa.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa.shape}"
+            
+        return self.scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum(dim=-1) \
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) \
+                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum(dim=-1) 
 
     def unnormalized_log_prob(self, params):
+        return self.unnormalized_log_prob_per_chain(params=params).sum()
+    
+
+class VptmJointDistributionLogKappa(JointDistribution):
+
+    def __init__(self, M, data_tr, S_input, alpha, c, mu0, v, positive = False, gpu = False):
+        super().__init__(M=M, data_tr=data_tr, S_input=S_input, gpu=gpu)
+        
+        self.alpha = alpha
+        self.c = c
+        self.mu0 = mu0
+        self.v = v
+        self.positive = positive
+
+
+    def unnormalized_log_prob_per_chain(self, params):
         if self.stochastic_gradient:
             self.x, self.idx = get_block_diag_data_batches_all_chains(data_tr=self.data_tr, S=self.S, M=self.M, gpu=self.gpu)
 
@@ -160,10 +205,12 @@ class VptmJointDistribution(JointDistribution):
         assert kappa_rn.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa_rn.shape}"
         kappa = dist.ExpTransform()(kappa_rn)
             
-        return self.scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum() \
-                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum() \
-                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum() 
+        return self.scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=self.x).sum(dim=-1) \
+                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum(dim=-1) \
+                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum(dim=-1) 
 
+    def unnormalized_log_prob(self, params):
+        return self.unnormalized_log_prob_per_chain(params=params).sum()
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
     

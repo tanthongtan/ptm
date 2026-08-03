@@ -70,11 +70,10 @@ class PositiveGeodesic(Geodesic):
     
     def geodesic(self, x, v):
         epsilon = self.epsilon / 2
-        x_new = x + epsilon * v
-        v_new = v
-        negative_indices = x_new < 0
-        x_new[negative_indices] = -x_new[negative_indices]
-        v_new[negative_indices] = -v_new[negative_indices]
+        x_proposed = x + epsilon * v
+        negative_indices = x_proposed < 0
+        x_new = x_proposed.abs()
+        v_new = torch.where(negative_indices, -v, v)
         return (x_new, v_new)
     
 class RnGeodesic(Geodesic):
