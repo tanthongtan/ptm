@@ -6,8 +6,8 @@ Created on Thu Feb 20 21:06:48 2020
 """
 
 import torch
-import torch.distributions as dist
 import numpy as np
+from dataset import get_block_diag_data_batches_all_chains
 
 def grad(f):
     def result(params):
@@ -16,19 +16,36 @@ def grad(f):
         return {name: param_.grad for name, param_ in params_.items()}
     return result
     
-    
-def sggmc_transition(params, vs, geodesics, distribution):
-    params_star = {name: param.clone() for name, param in params.items()}
-    vs_star = {name: v.clone() for name, v in vs.items()}
-    for name, _ in params_star.items():
-        params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])
-        vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
-    grads = grad(distribution.unnormalized_log_prob)(params_star)
-    for name, _ in params_star.items():                
-        vs_star[name] = geodesics[name].projection(params_star[name], vs_star[name] + grads[name]*geodesics[name].epsilon + (torch.randn_like(params_star[name]) * ((2*geodesics[name].c*geodesics[name].epsilon)**0.5)))
-        vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
-        params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])                
-    return params_star, vs_star
+
+class GeodesicMonteCarlo:
+
+    def __init__(self, M, data_tr, S, gpu = False):
+        self.M = M
+        self.data_tr = data_tr
+        self.gpu = gpu
+        self.S = S
+        self.stochastic_gradient = S < data_tr.shape[0]
+
+        if not self.stochastic_gradient:
+            self.x, self.idx = get_block_diag_data_batches_all_chains(data_tr=data_tr, S=S, M=M, gpu=gpu)
+        
+
+    def stochastic_transition(self, params, vs, geodesics, distribution):
+        params_star = {name: param.clone() for name, param in params.items()}
+        vs_star = {name: v.clone() for name, v in vs.items()}
+        for name, _ in params_star.items():
+            params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])
+            vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
+        if self.stochastic_gradient:
+            x, idx = get_block_diag_data_batches_all_chains(data_tr=self.data_tr, S=self.S, M=self.M, gpu=self.gpu)
+        else:
+            x, idx = self.x, self.idx
+        grads = grad(distribution.get_unnormalized_log_prob(x=x, idx=idx))(params_star)
+        for name, _ in params_star.items():                
+            vs_star[name] = geodesics[name].projection(params_star[name], vs_star[name] + grads[name]*geodesics[name].epsilon + (torch.randn_like(params_star[name]) * ((2*geodesics[name].c*geodesics[name].epsilon)**0.5)))
+            vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
+            params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name])                
+        return params_star, vs_star
 
 class Geodesic:
     
