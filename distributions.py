@@ -21,6 +21,10 @@ class Initialization:
         init_pi = dist.Dirichlet(torch.full((self.num_topic,), initial_alpha)).sample([self.M, self.num_tr])
         return HelmertILRTransform()(init_pi)
 
+    def get_initial_pi_sphere(self, initial_alpha = 10.0):
+        init_pi = dist.Dirichlet(torch.full((self.num_topic,), initial_alpha)).sample([self.M, self.num_tr])
+        return init_pi ** 0.5
+
     def get_initial_kappa_rn(self, initial_mrl = 0.5):
         random_mrl = torch.randn(self.M, self.num_topic) / 100 + initial_mrl
         random_mrl = random_mrl.clip(min=0.01, max=0.99)
@@ -40,6 +44,9 @@ def log_prob_exponential_log_a(b, a_rn, a):
 
 def log_prob_dirichlet_ilr_pi(alpha, pi_rn, pi):
     return dist.Dirichlet(alpha).log_prob(pi) + HelmertILRTransform().inv.log_abs_det_jacobian(pi_rn, pi)
+
+def unnormalized_log_prob_spherical_dirichlet(alpha, pi_sphere):
+    return ((2*alpha-1)*torch.log(torch.abs(pi_sphere))).sum(dim=-1)
 
 def log_prob_von_mises_fisher_single_datapoint(natural_param, X):
     logcdk = Logcdk.apply
@@ -160,6 +167,34 @@ class VptmJointDistribution(JointDistribution):
                 + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) \
                 + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum(dim=-1) 
 
+class VptmJointDistributionSphericalDirichlet(JointDistribution):
+
+    def __init__(self, alpha, c, mu0, v, positive = False):        
+        self.alpha = alpha
+        self.c = c
+        self.mu0 = mu0
+        self.v = v
+        self.positive = positive
+
+    def unnormalized_log_prob_per_chain(self, params, x, idx):
+        pi_sphere = params['pi_sphere']
+        pi = pi_sphere ** 2
+        M = pi.shape[0]
+        chain_indices = torch.arange(M, dtype=torch.long, device=pi.device).unsqueeze(-1)
+        pi_chosen = pi[chain_indices, idx]
+
+        scaling_factor = pi.shape[-2]/pi_chosen.shape[-2]
+        
+        mu = params['mu']
+        if self.positive == True:
+            mu = torch.abs(mu)
+
+        kappa = params['kappa']
+        assert kappa.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa.shape}"
+            
+        return scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) \
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) \
+                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1) 
     
 
 class VptmJointDistributionLogKappa(JointDistribution):
