@@ -6,6 +6,7 @@ Created on Thu Feb 20 21:06:48 2020
 """
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 from dataset import get_block_diag_data_batches_all_chains
 
@@ -78,6 +79,8 @@ class SphericalGeodesic(Geodesic):
         sin_norm_t = torch.sin(v_norm * epsilon)
         x_new = x * cos_norm_t + v / v_norm * sin_norm_t
         v_new = v * cos_norm_t - v_norm * x * sin_norm_t
+        x_new = F.normalize(x_new, p=2, dim=-1)
+        v_new = self.projection(x_new, v_new)
         return (x_new, v_new)
     
 class PositiveGeodesic(Geodesic):
