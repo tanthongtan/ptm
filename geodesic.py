@@ -39,8 +39,8 @@ class GeodesicMonteCarlo:
         vs = {name: geodesics[name].projection(params[name],torch.randn_like(params[name])) for name in params}
         h = distribution.unnormalized_log_prob_per_chain(params, self.x, self.idx) - kinetic_per_chain(vs)
         params_star = {name: param.clone() for name, param in params.items()}
+        grads = grad(unnormalized_log_prob)(params_star)
         for _ in range(self.T):
-            grads = grad(unnormalized_log_prob)(params_star)
             for name, param_star in params_star.items():
                 vs[name] = geodesics[name].projection(param_star, vs[name] + geodesics[name].epsilon/2.0 * grads[name])
                 params_star[name], vs[name] = geodesics[name].geodesic(param_star, vs[name], 1)
