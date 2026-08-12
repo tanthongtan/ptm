@@ -109,9 +109,9 @@ def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
 
 class JointDistribution:
        
-    def get_unnormalized_log_prob(self, x, idx):
+    def get_unnormalized_log_prob(self, x, idx, beta=1):
         def unnormalized_log_prob(params):
-            return self.unnormalized_log_prob_per_chain(params=params, x=x, idx=idx).sum()
+            return self.unnormalized_log_prob_per_chain(params=params, x=x, idx=idx, beta=beta).sum()
         return unnormalized_log_prob
         
 
@@ -176,7 +176,7 @@ class VptmJointDistributionSphericalDirichlet(JointDistribution):
         self.v = v
         self.positive = positive
 
-    def unnormalized_log_prob_per_chain(self, params, x, idx):
+    def unnormalized_log_prob_per_chain(self, params, x, idx, beta=1):
         pi_sphere = params['pi_sphere']
         pi = pi_sphere ** 2
         M = pi.shape[0]
@@ -192,9 +192,9 @@ class VptmJointDistributionSphericalDirichlet(JointDistribution):
         kappa = params['kappa']
         assert kappa.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa.shape}"
             
-        return scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) \
-                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) \
-                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1) 
+        return beta * (scaling_factor * log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) 
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) 
+                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1)) 
     
 
 class VptmJointDistributionLogKappa(JointDistribution):

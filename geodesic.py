@@ -34,10 +34,10 @@ class GeodesicMonteCarlo:
             self.x, self.idx = get_block_diag_data_batches_all_chains(data_tr=data_tr, S=S, M=M, gpu=gpu)
 
 
-    def transition(self, params, geodesics, distribution):
-        unnormalized_log_prob = distribution.get_unnormalized_log_prob(x=self.x, idx=self.idx)
+    def transition(self, params, geodesics, distribution, beta=1):
+        unnormalized_log_prob = distribution.get_unnormalized_log_prob(x=self.x, idx=self.idx, beta=beta)
         vs = {name: geodesics[name].projection(params[name],torch.randn_like(params[name])) for name in params}
-        h = distribution.unnormalized_log_prob_per_chain(params, self.x, self.idx) - kinetic_per_chain(vs)
+        h = distribution.unnormalized_log_prob_per_chain(params=params, x=self.x, idx=self.idx, beta=beta) - kinetic_per_chain(vs)
         params_star = {name: param.clone() for name, param in params.items()}
         grads = grad(unnormalized_log_prob)(params_star)
         for _ in range(self.T):
@@ -47,7 +47,7 @@ class GeodesicMonteCarlo:
             grads = grad(unnormalized_log_prob)(params_star)
             for name, param_star in params_star.items():
                 vs[name] = geodesics[name].projection(param_star, vs[name] + geodesics[name].epsilon/2.0 * grads[name])
-        h_star = distribution.unnormalized_log_prob_per_chain(params_star, self.x, self.idx) - kinetic_per_chain(vs)
+        h_star = distribution.unnormalized_log_prob_per_chain(params=params_star, x=self.x, idx=self.idx, beta=beta) - kinetic_per_chain(vs)
         u = torch.rand_like(h_star)
         accept_prob = torch.exp(h_star - h)
         for name, param in params.items():
@@ -55,7 +55,7 @@ class GeodesicMonteCarlo:
         return params_star, accept_prob
     
 
-    def stochastic_transition(self, params, vs, geodesics, distribution):
+    def stochastic_transition(self, params, vs, geodesics, distribution, beta=1):
         params_star = {name: param.clone() for name, param in params.items()}
         vs_star = {name: v.clone() for name, v in vs.items()}
         for name, _ in params_star.items():
@@ -65,7 +65,7 @@ class GeodesicMonteCarlo:
             x, idx = get_block_diag_data_batches_all_chains(data_tr=self.data_tr, S=self.S, M=self.M, gpu=self.gpu)
         else:
             x, idx = self.x, self.idx
-        grads = grad(distribution.get_unnormalized_log_prob(x=x, idx=idx))(params_star)
+        grads = grad(distribution.get_unnormalized_log_prob(x=x, idx=idx, beta=beta))(params_star)
         for name, _ in params_star.items():                
             vs_star[name] = geodesics[name].projection(params_star[name], vs_star[name] + grads[name]*geodesics[name].epsilon + (torch.randn_like(params_star[name]) * ((2*geodesics[name].c*geodesics[name].epsilon)**0.5)))
             vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
