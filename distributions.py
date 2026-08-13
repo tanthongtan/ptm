@@ -104,7 +104,8 @@ def log_prob_vmf_conjugate_prior_log_kappa(c, v, mu0, mu, kappa_rn, kappa):
 
 def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
     logcdk = Logcdk.apply
-    return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1) 
+    D = mu0.shape[-1]
+    return v * logcdk(D, kappa) + c * kappa * (mu0 * mu).sum(dim=-1) + (D-1) * torch.log(kappa) 
 
 
 class JointDistribution:
