@@ -99,8 +99,8 @@ def log_prob_bvmfmix_likelihood(mu, kappa, pi, X):
 
 def log_prob_vmf_conjugate_prior_log_kappa(c, v, mu0, mu, kappa_rn, kappa):
     logcdk = Logcdk.apply
-    return v * logcdk(mu0.shape[-1], kappa) + c * kappa * (mu0 * mu).sum(dim=-1) \
-        + dist.ExpTransform().log_abs_det_jacobian(kappa_rn, kappa)
+    D = mu0.shape[-1]
+    return v * logcdk(D, kappa) + c * kappa * (mu0 * mu).sum(dim=-1) + D * kappa_rn
 
 def log_prob_vmf_conjugate_prior(c, v, mu0, mu, kappa):
     logcdk = Logcdk.apply
@@ -207,9 +207,9 @@ class VptmJointDistributionLogKappa(JointDistribution):
         self.v = v
         self.positive = positive
 
-    def unnormalized_log_prob_per_chain(self, params, x, idx):
-        pi_rn = params['pi_rn']
-        pi = HelmertILRTransform().inv(pi_rn)
+    def unnormalized_log_prob_per_chain(self, params, x, idx, beta=1):
+        pi_sphere = params['pi_sphere']
+        pi = pi_sphere ** 2
         M = pi.shape[0]
         chain_indices = torch.arange(M, dtype=torch.long, device=pi.device).unsqueeze(-1)
         pi_chosen = pi[chain_indices, idx]
@@ -222,11 +222,11 @@ class VptmJointDistributionLogKappa(JointDistribution):
 
         kappa_rn = params['kappa_rn']
         assert kappa_rn.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa_rn.shape}"
-        kappa = dist.ExpTransform()(kappa_rn)
+        kappa = kappa_rn.exp()
             
-        return scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) \
-                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum(dim=-1) \
-                + log_prob_dirichlet_ilr_pi(self.alpha, pi_rn, pi).sum(dim=-1) 
+        return beta * (scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) 
+                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum(dim=-1) 
+                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1)) 
 
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
