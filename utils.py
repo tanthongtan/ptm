@@ -87,12 +87,12 @@ def get_topics(topic_matrix, vocab, n_top_words = 10):
 def vmf_perplexity(tensor_te, mu_final, kappa_final, alpha, N=1000):
     result = 0
     for i,doc_te in enumerate(tensor_te):
-        prior_pi = dist.Dirichlet(alpha.flatten()).sample([N])
+        prior_pi = dist.Dirichlet(alpha).sample([N])
         if isinstance(kappa_final, Number):
             avg = kappa_final * F.normalize(torch.matmul(prior_pi,mu_final), p=2, dim=-1)
         else:
-            avg = torch.matmul(prior_pi, kappa_final.reshape((-1, 1)) * mu_final)
-        log_likelihood = D.log_prob_von_mises_fisher(avg, doc_te)
+            avg = torch.matmul(prior_pi, kappa_final.unsqueeze(-1) * mu_final)
+        log_likelihood = D.log_prob_von_mises_fisher_single_datapoint(avg, doc_te)
         result += torch.logsumexp(log_likelihood, -1) - np.log(N)
     return - 1. / tensor_te.shape[0] * result
 
