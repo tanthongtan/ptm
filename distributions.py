@@ -193,9 +193,9 @@ class VptmJointDistributionSphericalDirichlet(JointDistribution):
         kappa = params['kappa']
         assert kappa.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa.shape}"
             
-        return beta * (scaling_factor * log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) 
-                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) 
-                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1)) 
+        return beta * scaling_factor * log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) \
+                + log_prob_vmf_conjugate_prior(self.c, self.v, self.mu0, mu, kappa).sum(dim=-1) \
+                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1) 
     
 
 class VptmJointDistributionLogKappa(JointDistribution):
@@ -224,9 +224,9 @@ class VptmJointDistributionLogKappa(JointDistribution):
         assert kappa_rn.shape == mu.shape[:-1], f"Expected shape {mu.shape[:-1]}, got {kappa_rn.shape}"
         kappa = kappa_rn.exp()
             
-        return beta * (scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) 
-                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum(dim=-1) 
-                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1)) 
+        return beta * scaling_factor*log_prob_vptm_likelihood(pi=pi_chosen, kappa=kappa, mu=mu, X=x).sum(dim=-1) \
+                + log_prob_vmf_conjugate_prior_log_kappa(self.c, self.v, self.mu0, mu, kappa_rn, kappa).sum(dim=-1) \
+                + unnormalized_log_prob_spherical_dirichlet(self.alpha, pi_sphere).sum(dim=-1)
 
                 
 class BvmfmixJointDistributionWithStickDirConjugatePrior:
