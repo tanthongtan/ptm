@@ -17,6 +17,7 @@ import subprocess
 import os
 import scipy.sparse
 import sklearn.metrics
+from lcdk import ratio
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -129,3 +130,6 @@ def get_invalid_topics(pi, kappa, threshold = None):
         if invalid:
             invalids.append(j)
     return invalids
+
+def get_mrl(kappa, mu):
+    return ratio(mu.shape[-1]/2, kappa)
