@@ -53,20 +53,39 @@ def get_coherences(result):
             coherences.append(float(line.split()[1]))
     return coherences, mean(coherences)
 
-def print_summary(topics, method, dataset):
+def print_summary(topics, method, dataset, num_topic, M, num_samples):
     filename = str(random.randint(0,100000000))
     save_topics(topics,filename)
     result = subprocess.Popen(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].decode()
-    coherences, mean_coherence = get_coherences(result)
-    uniquenesses, mean_uniqueness = get_topic_uniqueness(topics)
+    coherences_all, mean_coherence_all = get_coherences(result)
+    uniquenesses_all = []
     print("\nMethod  =", method)
-    print("Number of topics =", len(topics))
+    print("Number of topics =", num_topic)
     print("Dataset =", dataset, "\n")
-    print(" NPMI      ", "TU        ", "Topic") 
-    for coherence, uniqueness, topic in zip(coherences, uniquenesses, topics):
-        print("{:8.5f} {:10.5f}   ".format(coherence, uniqueness), *topic)
-    print("\nMean NPMI =", mean_coherence)
-    print("Mean TU   =", mean_uniqueness, "\n")
+    for i in range(M):
+        coherences_run = []
+        uniquenesses_run = []
+        for j in range(num_samples):
+            sample_start_idx = i * num_samples * num_topic + j * num_topic
+            sample_topic_indices = slice(sample_start_idx, sample_start_idx + num_topic)
+            sample_topics = topics[sample_topic_indices]
+            sample_coherences = coherences_all[sample_topic_indices]
+            mean_coherence_sample = mean(sample_coherences)
+            sample_uniquenesses, mean_uniqueness_sample = get_topic_uniqueness(sample_topics)
+            
+            print(" NPMI      ", "TU        ", "Topic") 
+            for coherence, uniqueness, topic in zip(sample_coherences, sample_uniquenesses, sample_topics):
+                print("{:8.5f} {:10.5f}   ".format(coherence, uniqueness), *topic)
+            print("\nSample Mean NPMI =", mean_coherence_sample)
+            print("Sample Mean TU   =", mean_uniqueness_sample, "\n")
+            coherences_run.append(mean_coherence_sample)
+            uniquenesses_run.append(mean_uniqueness_sample)
+        mean_uniqueness_run = mean(uniquenesses_run)
+        print("\nRun Mean NPMI =", mean(coherences_run))
+        print("Run Mean TU   =", mean_uniqueness_run, "\n")
+        uniquenesses_all.append(mean_uniqueness_run)
+    print("\nAll Mean NPMI =", mean_coherence_all)
+    print("All Mean TU   =", mean(uniquenesses_all), "\n")
     os.remove(filename)
 
 def save_topics(topics, filename):
