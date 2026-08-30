@@ -22,16 +22,15 @@ def kinetic_per_chain(vs):
 
 class GeodesicMonteCarlo:
 
-    def __init__(self, M, data_tr, S, T = None, gpu = False):
+    def __init__(self, M, tensor_tr, S, T = None):
         self.M = M
-        self.data_tr = data_tr
+        self.tensor_tr = tensor_tr
         self.T = T
-        self.gpu = gpu
         self.S = S
-        self.stochastic_gradient = S < data_tr.shape[0]
+        self.stochastic_gradient = S < tensor_tr.shape[0]
 
         if not self.stochastic_gradient:
-            self.x, self.idx = get_block_diag_data_batches_all_chains(data_tr=data_tr, S=S, M=M, gpu=gpu)
+            self.x, self.idx = get_block_diag_data_batches_all_chains(tensor_tr=tensor_tr, S=S, M=M)
 
 
     def transition(self, params, geodesics, distribution, beta=1):
@@ -62,7 +61,7 @@ class GeodesicMonteCarlo:
             params_star[name], vs_star[name] = geodesics[name].geodesic(params_star[name], vs_star[name], 0.5)
             vs_star[name] = np.exp(-geodesics[name].c*geodesics[name].epsilon/2) * vs_star[name]
         if self.stochastic_gradient:
-            x, idx = get_block_diag_data_batches_all_chains(data_tr=self.data_tr, S=self.S, M=self.M, gpu=self.gpu)
+            x, idx = get_block_diag_data_batches_all_chains(tensor_tr=self.tensor_tr, S=self.S, M=self.M)
         else:
             x, idx = self.x, self.idx
         grads = grad(distribution.get_unnormalized_log_prob(x=x, idx=idx, beta=beta))(params_star)

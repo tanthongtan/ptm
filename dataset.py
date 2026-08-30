@@ -4,6 +4,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 import torch
 import sklearn.preprocessing as P
 import scipy.sparse
+import torch.nn.functional as F
 
 def csr_to_torchsparse(x, gpu = False):
     assert scipy.sparse.isspmatrix_csr(x), "x must be a SciPy CSR matrix"
@@ -41,13 +42,26 @@ def load_data(dataset, use_tfidf, normalize, sublinear = False):
     return (data_tr, data_te, vocab, vocab_size, num_tr)
 
 
-def get_block_diag_data_batches_all_chains(data_tr, S, M, gpu = False):
-    num_tr = data_tr.shape[0]
-    indices = np.array([np.random.permutation(num_tr)[:S] for x in range(M)])
-    all_chains_batches = [data_tr[indices[x]] for x in range(M)]
-    scipy_block_diag = scipy.sparse.block_diag(all_chains_batches, format="csr")
-
-    torch_indices = torch.LongTensor(indices)
-    if gpu:
-        torch_indices = torch_indices.cuda()
-    return csr_to_torchsparse(scipy_block_diag, gpu), torch_indices
+def get_block_diag_data_batches_all_chains(tensor_tr, S, M):
+    device = tensor_tr.device
+    num_tr, vocab_size = tensor_tr.shape
+    torch_indices = torch.stack([torch.randperm(num_tr, device = device)[:S] for x in range(M)])
+    S = torch_indices.shape[-1]
+    indices = torch_indices.reshape(-1)
+    full_crow = tensor_tr.crow_indices()
+    batch_starts = full_crow[indices]
+    batch_counts = full_crow[indices + 1] - batch_starts
+    batch_crow = F.pad(batch_counts,(1,0)).cumsum(dim=0)
+    batch_total_nnz = batch_crow[-1].item()
+    batch_original_indices = (torch.repeat_interleave(batch_starts - batch_crow[:-1], batch_counts, output_size=batch_total_nnz)
+                              + torch.arange(batch_total_nnz, device = device))
+    batch_col_indices = tensor_tr.col_indices()[batch_original_indices]
+    batch_values = tensor_tr.values()[batch_original_indices]
+    # extraction done, now make it block diagonal
+    batch_col_indices_offsets = (torch.repeat_interleave(torch.arange(M, device = device)*vocab_size, S, output_size=M*S)
+                                 .repeat_interleave(batch_counts, output_size=batch_total_nnz))
+    batch_col_indices += batch_col_indices_offsets
+    
+    return (torch.sparse_csr_tensor(crow_indices=batch_crow, col_indices=batch_col_indices, 
+                                   values=batch_values, size=(M*S, M*vocab_size)), 
+            torch_indices)
