@@ -125,12 +125,18 @@ def clustering_metrics_20news(pi):
     chosen = data_tr.getnnz(1) > 0
     y_tr = y_tr[chosen]
     target = pi.argmax(axis=1)
-        
-    print("                NMI:   %.4f" % sklearn.metrics.normalized_mutual_info_score(y_tr,target))
-    print("Adjusted RAND index:   %.4f" % sklearn.metrics.adjusted_rand_score(y_tr,target))
-    print("        Adjusted MI:   %.4f" % sklearn.metrics.adjusted_mutual_info_score(y_tr,target))
-    print("            Fowlkes:   %.4f" % sklearn.metrics.fowlkes_mallows_score(y_tr,target))
-    print("        Homogeneity:   %.4f" % sklearn.metrics.homogeneity_score(y_tr, target))
+
+    nmi = sklearn.metrics.normalized_mutual_info_score(y_tr,target)
+    ari = sklearn.metrics.adjusted_rand_score(y_tr,target)
+    ami = sklearn.metrics.adjusted_mutual_info_score(y_tr,target)
+    flk = sklearn.metrics.fowlkes_mallows_score(y_tr,target)  
+    hom = sklearn.metrics.homogeneity_score(y_tr, target)  
+    print("                NMI:   %.4f" % nmi)
+    print("Adjusted RAND index:   %.4f" % ari)
+    print("        Adjusted MI:   %.4f" % ami)
+    print("            Fowlkes:   %.4f" % flk)
+    print("        Homogeneity:   %.4f" % hom)
+    return nmi, ari, ami, flk, hom
 
 def get_invalid_topics(pi, kappa, threshold = None):
     weights = pi*kappa.flatten()
