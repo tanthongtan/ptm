@@ -18,6 +18,7 @@ import os
 import scipy.sparse
 import sklearn.metrics
 from lcdk import ratio
+import math
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -160,3 +161,25 @@ def get_invalid_topics(pi, kappa, threshold = None):
 
 def get_mrl(kappa, mu):
     return ratio(mu.shape[-1]/2, kappa)
+
+
+def summarize_3d(var, var_name):
+    mean = var.mean(dim=-1)
+    print(f"{var_name} mean: {mean}")
+    min, _ = var.min(dim=-1)
+    print(f"{var_name} min: {min}")
+    max, _ = var.max(dim=-1)
+    print(f"{var_name} max: {max}")
+    q = torch.tensor([0.05, 0.95])
+    q5, q95 = var.quantile(q, dim=-1)
+    print(f"{var_name} q5: {q5}")
+    print(f"{var_name} q95: {q95}")
+    return mean, min, max, q5, q95
+
+
+def normalized_entropy(var):
+    return -(var * var.clamp_min(1e-15).log()).sum(-1) / math.log(var.shape[-1])
+
+def get_beta(t, L, endpoint=1):
+    phase = ((t % L) + 1) / L
+    return (1 + math.cos(2 * math.pi * phase / endpoint))/2 if phase <= endpoint else 1
