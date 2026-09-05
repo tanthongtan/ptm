@@ -163,23 +163,51 @@ def get_mrl(kappa, mu):
     return ratio(mu.shape[-1]/2, kappa)
 
 
-def summarize_3d(var, var_name):
+def summarize_3d(var):
     mean = var.mean(dim=-1)
-    print(f"{var_name} mean: {mean}")
     min, _ = var.min(dim=-1)
-    print(f"{var_name} min: {min}")
     max, _ = var.max(dim=-1)
-    print(f"{var_name} max: {max}")
     q = torch.tensor([0.05, 0.95])
     q5, q95 = var.quantile(q, dim=-1)
-    print(f"{var_name} q5: {q5}")
-    print(f"{var_name} q95: {q95}")
     return mean, min, max, q5, q95
 
 
 def normalized_entropy(var):
     return -(var * var.clamp_min(1e-15).log()).sum(-1) / math.log(var.shape[-1])
 
-def get_beta(t, L, endpoint=1):
+def get_beta(t, L, endpoint=1, r=1):
     phase = ((t % L) + 1) / L
-    return (1 + math.cos(2 * math.pi * phase / endpoint))/2 if phase <= endpoint else 1
+    return ((1 + math.cos(2 * math.pi * phase / endpoint))/2)**r if phase <= endpoint else 1
+
+
+def style_df(df):
+    return (
+        df.style
+            .format({
+                "kappa": "{:.0f}",
+                "prior_dots": "{:.3f}",
+                "sparsity": "{:.3f}",
+            })
+            .set_properties(**{"text-align": "left"})
+            .set_table_styles([
+                {
+                    "selector": "th",
+                    "props": [("text-align", "left")]
+                }
+            ])
+    )
+
+# for history dict, each metric history has shape [M, num_samples]
+def append_metrics_to_history(metrics, history):
+    M = next(iter(metrics.values())).shape[0]
+
+    for name, value in metrics.items():
+        column = value.detach().cpu().numpy().reshape(M, 1)
+        history[name] = np.concatenate(
+            [history[name], column],
+            axis=1,
+        )
+
+def print_metric_dictionary(metrics):
+    for key, value in metrics.items():
+        print(f"{key.replace("_", " ")}: {value}")
