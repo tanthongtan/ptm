@@ -19,6 +19,10 @@ import scipy.sparse
 import sklearn.metrics
 from lcdk import ratio
 import math
+import tempfile
+import pickle
+from pathlib import Path
+import hashlib
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -54,11 +58,33 @@ def get_coherences(result):
             coherences.append(float(line.split()[1]))
     return coherences, mean(coherences)
 
-def print_summary(topics, method, dataset, num_topic, M, num_samples):
-    filename = str(random.randint(0,100000000))
-    save_topics(topics,filename)
-    result = subprocess.Popen(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].decode()
-    coherences_all, mean_coherence_all = get_coherences(result)
+def print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets_to_npmi):
+    new_topic_sets_to_npmi = topic_sets_to_npmi.copy()
+    unique_topics = set()
+    topic_sets = []
+    for topic in topics:
+        topic_set = frozenset(topic)
+        topic_sets.append(topic_set)
+        unique_topics.add(topic_set)
+
+    unique_topics_for_palmetto = []
+    for unique_topic in unique_topics:
+        if unique_topic not in new_topic_sets_to_npmi:
+            unique_topics_for_palmetto.append(unique_topic)
+
+    if unique_topics_for_palmetto:
+        filename = str(random.randint(0,100000000))
+        save_topics(unique_topics_for_palmetto,filename)
+        result = subprocess.Popen(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].decode()
+        coherences_from_palmetto, _ = get_coherences(result)
+        assert len(coherences_from_palmetto) == len(unique_topics_for_palmetto), f"Expected {len(unique_topics_for_palmetto)} scores, received {len(coherences_from_palmetto)}."
+        assert all(isinstance(x, float) and math.isfinite(x) for x in coherences_from_palmetto), f"Numerical error in Palmetto output." 
+        for unique_topic_for_palmetto, coherence_from_palmetto in zip(unique_topics_for_palmetto, coherences_from_palmetto):
+            new_topic_sets_to_npmi[unique_topic_for_palmetto] = coherence_from_palmetto
+
+    coherences_all = []
+    for topic_set in topic_sets:
+        coherences_all.append(new_topic_sets_to_npmi[topic_set])
     uniquenesses_all = []
     print("\nMethod  =", method)
     print("Number of topics =", num_topic)
@@ -85,9 +111,11 @@ def print_summary(topics, method, dataset, num_topic, M, num_samples):
         print("\nRun Mean NPMI =", mean(coherences_run))
         print("Run Mean TU   =", mean_uniqueness_run, "\n")
         uniquenesses_all.append(mean_uniqueness_run)
-    print("\nAll Mean NPMI =", mean_coherence_all)
+    print("\nAll Mean NPMI =", mean(coherences_all))
     print("All Mean TU   =", mean(uniquenesses_all), "\n")
-    os.remove(filename)
+    if unique_topics_for_palmetto:
+        os.remove(filename)
+    return new_topic_sets_to_npmi
 
 def save_topics(topics, filename):
     with open(filename, 'w') as file:
@@ -211,3 +239,71 @@ def append_metrics_to_history(metrics, history):
 def print_metric_dictionary(metrics):
     for key, value in metrics.items():
         print(f"{key.replace("_", " ")}: {value}")
+
+
+def save_obj(obj, path_string):
+    path = Path(path_string)
+
+    obj_bytes = pickle.dumps(obj)
+    obj_checksum = hashlib.sha256(obj_bytes).digest()
+
+    payload = (obj_checksum, obj_bytes)
+
+    tempfile_path = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, mode="wb", delete=False) as file:
+            tempfile_path = Path(file.name)
+            pickle.dump(payload, file)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(tempfile_path, path)
+    except Exception as e1:
+        if tempfile_path and tempfile_path.exists():
+            try:
+                tempfile_path.unlink()
+            except Exception as e2:
+                raise e2 from e1
+        raise 
+
+def load_obj(path_string):
+    path = Path(path_string)
+
+    with open(path, 'rb') as file:
+        payload = pickle.load(file)
+    assert isinstance(payload, tuple) and len(payload) == 2, "Payload has to be a 2-tuple of (checksum, data)."
+
+    checksum, obj_bytes = payload
+    assert isinstance(checksum, bytes) and len(checksum) == 32 and isinstance(obj_bytes, bytes), "Invalid checksum or payload."
+
+    assert hashlib.sha256(obj_bytes).digest() == checksum, "Checksum mismatch, data may be corrupted."
+    return pickle.loads(obj_bytes)
+
+
+def save_topic_sets_to_npmi(old_topic_sets_to_npmi, new_topic_sets_to_npmi, path_string):
+    assert is_valid_topic_sets_to_npmi_dict(old_topic_sets_to_npmi), "Old topic sets to npmi dict isn't valid."
+    assert is_valid_topic_sets_to_npmi_dict(new_topic_sets_to_npmi), "New topic sets to npmi dict isn't valid."
+
+    if new_topic_sets_to_npmi.items() > old_topic_sets_to_npmi.items():
+        path = Path(path_string)
+        old_path = path.with_name(f"{path.stem}-backup{path.suffix}")
+        save_obj(old_topic_sets_to_npmi, str(old_path))
+        save_obj(new_topic_sets_to_npmi, path_string)
+    else:
+        print("New dictionary isn't greater than current, no operation.")
+
+def load_topic_sets_to_npmi(path_string):
+    path = Path(path_string)
+    if path.exists():
+        topic_sets_to_npmi = load_obj(path_string)
+    else:
+        topic_sets_to_npmi = {}
+    assert is_valid_topic_sets_to_npmi_dict(topic_sets_to_npmi), "Loaded topic sets to npmi dict isn't valid."
+    return topic_sets_to_npmi
+
+def is_valid_topic_sets_to_npmi_dict(topic_sets_to_npmi):
+    return (isinstance(topic_sets_to_npmi, dict) and 
+            all(isinstance(k, frozenset) and 
+                len(k)==10 and
+                all(isinstance(word, str) and word for word in k) and
+                isinstance(v, float) and
+                math.isfinite(v) for k, v in topic_sets_to_npmi.items()))
