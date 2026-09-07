@@ -58,7 +58,7 @@ def get_coherences(result):
             coherences.append(float(line.split()[1]))
     return coherences, mean(coherences)
 
-def print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets_to_npmi):
+def get_coherences_all(topics, topic_sets_to_npmi):
     new_topic_sets_to_npmi = topic_sets_to_npmi.copy()
     unique_topics = set()
     topic_sets = []
@@ -76,6 +76,7 @@ def print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets
         filename = str(random.randint(0,100000000))
         save_topics(unique_topics_for_palmetto,filename)
         result = subprocess.Popen(["java", "-jar", "palmetto-exec.jar", "wiki_final/wiki_final", "NPMI", filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].decode()
+        os.remove(filename)
         coherences_from_palmetto, _ = get_coherences(result)
         assert len(coherences_from_palmetto) == len(unique_topics_for_palmetto), f"Expected {len(unique_topics_for_palmetto)} scores, received {len(coherences_from_palmetto)}."
         assert all(isinstance(x, float) and math.isfinite(x) for x in coherences_from_palmetto), f"Numerical error in Palmetto output." 
@@ -85,6 +86,11 @@ def print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets
     coherences_all = []
     for topic_set in topic_sets:
         coherences_all.append(new_topic_sets_to_npmi[topic_set])
+        
+    return coherences_all, new_topic_sets_to_npmi
+
+
+def print_summary(topics, method, dataset, num_topic, M, num_samples, coherences_all):
     uniquenesses_all = []
     print("\nMethod  =", method)
     print("Number of topics =", num_topic)
@@ -113,9 +119,13 @@ def print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets
         uniquenesses_all.append(mean_uniqueness_run)
     print("\nAll Mean NPMI =", mean(coherences_all))
     print("All Mean TU   =", mean(uniquenesses_all), "\n")
-    if unique_topics_for_palmetto:
-        os.remove(filename)
-    return new_topic_sets_to_npmi
+
+
+def get_coherences_all_and_print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets_to_npmi):
+    coherences_all, new_topic_sets_to_npmi = get_coherences_all(topics, topic_sets_to_npmi)
+    print_summary(topics, method, dataset, num_topic, M, num_samples, coherences_all)
+    return coherences_all, new_topic_sets_to_npmi
+
 
 def save_topics(topics, filename):
     with open(filename, 'w') as file:
