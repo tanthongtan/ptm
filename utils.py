@@ -92,6 +92,8 @@ def get_coherences_all(topics, topic_sets_to_npmi):
 
 def print_summary(topics, method, dataset, num_topic, M, num_samples, coherences_all):
     uniquenesses_all = []
+    coherence_history = []
+    uniqueness_history = []
     print("\nMethod  =", method)
     print("Number of topics =", num_topic)
     print("Dataset =", dataset, "\n")
@@ -117,14 +119,17 @@ def print_summary(topics, method, dataset, num_topic, M, num_samples, coherences
         print("\nRun Mean NPMI =", mean(coherences_run))
         print("Run Mean TU   =", mean_uniqueness_run, "\n")
         uniquenesses_all.append(mean_uniqueness_run)
+        coherence_history.append(coherences_run)
+        uniqueness_history.append(uniquenesses_run)
     print("\nAll Mean NPMI =", mean(coherences_all))
     print("All Mean TU   =", mean(uniquenesses_all), "\n")
+    return np.array(coherence_history), np.array(uniqueness_history)
 
 
 def get_coherences_all_and_print_summary(topics, method, dataset, num_topic, M, num_samples, topic_sets_to_npmi):
     coherences_all, new_topic_sets_to_npmi = get_coherences_all(topics, topic_sets_to_npmi)
-    print_summary(topics, method, dataset, num_topic, M, num_samples, coherences_all)
-    return coherences_all, new_topic_sets_to_npmi
+    coherence_history, uniqueness_history = print_summary(topics, method, dataset, num_topic, M, num_samples, coherences_all)
+    return coherences_all, new_topic_sets_to_npmi, coherence_history, uniqueness_history
 
 
 def save_topics(topics, filename):
