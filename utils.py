@@ -390,3 +390,18 @@ def save_checkpoint(i, settings_dict, params, vs, pi_sphere_samples, mu_samples,
         "topic_history": topic_history,
         "topic_history_iterations": topic_history_iterations
     }, path_string=path_string)
+
+def load_checkpoint(path_string):
+    checkpoint_dict = load_torch_obj(path_string)
+    
+    all_keys_list = ["i", "settings_dict", "params", "vs", "pi_sphere_samples", "mu_samples", "kappa_samples", 
+     "history", "history_iterations", "extended_history", "extended_history_iterations", 
+     "meta_history", "topic_history", "topic_history_iterations"]
+    (i, settings_dict, params, vs, pi_sphere_samples, mu_samples, kappa_samples, 
+        history, history_iterations, extended_history, extended_history_iterations, 
+        meta_history, topic_history, topic_history_iterations
+    ) = [checkpoint_dict[key] for key in all_keys_list]
+
+    return (i, settings_dict, params, vs, pi_sphere_samples, mu_samples, kappa_samples, 
+            history, history_iterations, extended_history, extended_history_iterations, 
+            meta_history, topic_history, topic_history_iterations)
