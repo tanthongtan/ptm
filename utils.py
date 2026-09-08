@@ -367,3 +367,26 @@ def load_torch_obj(path_string):
     with io.BytesIO(obj_bytes) as buffer:
         obj = torch.load(buffer, weights_only=False)
     return obj
+
+
+def save_checkpoint(i, settings_dict, params, vs, pi_sphere_samples, mu_samples, kappa_samples, 
+                    history, history_iterations, extended_history, extended_history_iterations,
+                    meta_history, topic_history, topic_history_iterations,
+                    path_string
+                    ):
+    save_torch_obj({
+        "i": i,
+        "settings_dict": settings_dict,
+        "params": params,
+        "vs": vs,
+        "pi_sphere_samples": pi_sphere_samples,
+        "mu_samples": mu_samples,
+        "kappa_samples": kappa_samples,
+        "history": dict(history),
+        "history_iterations": history_iterations,
+        "extended_history": dict(extended_history),
+        "extended_history_iterations": extended_history_iterations,
+        "meta_history": meta_history,
+        "topic_history": topic_history,
+        "topic_history_iterations": topic_history_iterations
+    }, path_string=path_string)
