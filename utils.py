@@ -23,6 +23,7 @@ import tempfile
 import pickle
 from pathlib import Path
 import hashlib
+import io
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -322,3 +323,47 @@ def is_valid_topic_sets_to_npmi_dict(topic_sets_to_npmi):
                 all(isinstance(word, str) and word for word in k) and
                 isinstance(v, float) and
                 math.isfinite(v) for k, v in topic_sets_to_npmi.items()))
+
+
+
+def save_torch_obj(obj, path_string):
+    path = Path(path_string)
+
+    with io.BytesIO() as buffer:
+        torch.save(obj, buffer)
+        obj_bytes = buffer.getvalue()
+    obj_checksum = hashlib.sha256(obj_bytes).digest()
+
+    payload = (obj_checksum, obj_bytes)
+
+    tempfile_path = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, mode="wb", delete=False) as file:
+            tempfile_path = Path(file.name)
+            torch.save(payload, file)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(tempfile_path, path)
+    except Exception as e1:
+        if tempfile_path and tempfile_path.exists():
+            try:
+                tempfile_path.unlink()
+            except Exception as e2:
+                raise e2 from e1
+        raise 
+
+def load_torch_obj(path_string):
+    path = Path(path_string)
+
+    with open(path, 'rb') as file:
+        payload = torch.load(file)
+    assert isinstance(payload, tuple) and len(payload) == 2, "Payload has to be a 2-tuple of (checksum, data)."
+
+    checksum, obj_bytes = payload
+    assert isinstance(checksum, bytes) and len(checksum) == 32 and isinstance(obj_bytes, bytes), "Invalid checksum or payload."
+
+    assert hashlib.sha256(obj_bytes).digest() == checksum, "Checksum mismatch, data may be corrupted."
+
+    with io.BytesIO(obj_bytes) as buffer:
+        obj = torch.load(buffer, weights_only=False)
+    return obj
