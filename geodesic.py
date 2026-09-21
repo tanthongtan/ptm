@@ -73,11 +73,13 @@ class GeodesicMonteCarlo:
 
 class Geodesic:
     
-    def __init__(self, epsilon = None, lambda_param = 1, c=None, gamma=None, zeta=None, N=None):
+    def __init__(self, epsilon = None, lambda_param = 1, c=None, gamma=None, zeta=None, N=None, D=None):
         if epsilon is not None:
             self.epsilon = epsilon
-        else:
-            self.epsilon = lambda_param * np.sqrt(gamma/N)
+        elif gamma and N and D is None:
+            self.epsilon = lambda_param * gamma / np.sqrt(N)
+        elif gamma and N and D:
+            self.epsilon = lambda_param * gamma / ((N ** (1/6)) * D)
         if c is not None:
             self.c = c
         elif zeta is not None:
