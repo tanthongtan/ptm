@@ -259,6 +259,7 @@ def print_metric_dictionary(metrics):
 
 def save_obj(obj, path_string):
     path = Path(path_string)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     obj_bytes = pickle.dumps(obj)
     obj_checksum = hashlib.sha256(obj_bytes).digest()
@@ -328,6 +329,7 @@ def is_valid_topic_sets_to_npmi_dict(topic_sets_to_npmi):
 
 def save_torch_obj(obj, path_string):
     path = Path(path_string)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     with io.BytesIO() as buffer:
         torch.save(obj, buffer)
