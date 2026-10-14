@@ -407,3 +407,15 @@ def load_checkpoint(path_string):
     return (i, settings_dict, params, vs, pi_sphere_samples, mu_samples, kappa_samples, 
             history, history_iterations, extended_history, extended_history_iterations, 
             meta_history, topic_history, topic_history_iterations)
+
+
+#epsilon heuristics for vptm and sam
+
+def get_epsilon_mu(lambda_mu, num_tr, vocab_size):
+    return lambda_mu / math.sqrt(num_tr * vocab_size)
+
+def get_epsilon_kappa(lambda_kappa, num_tr, vocab_size):
+    return lambda_kappa * math.sqrt(vocab_size / num_tr)
+
+def get_epsilon_pi(lambda_pi, vocab_size):
+    return lambda_pi / math.sqrt(vocab_size)
