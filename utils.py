@@ -261,7 +261,7 @@ def save_obj(obj, path_string):
     path = Path(path_string)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    obj_bytes = pickle.dumps(obj)
+    obj_bytes = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
     obj_checksum = hashlib.sha256(obj_bytes).digest()
 
     payload = (obj_checksum, obj_bytes)
@@ -270,7 +270,7 @@ def save_obj(obj, path_string):
     try:
         with tempfile.NamedTemporaryFile(dir=path.parent, mode="wb", delete=False) as file:
             tempfile_path = Path(file.name)
-            pickle.dump(payload, file)
+            pickle.dump(payload, file, protocol=pickle.HIGHEST_PROTOCOL)
             file.flush()
             os.fsync(file.fileno())
         os.replace(tempfile_path, path)
@@ -332,7 +332,7 @@ def save_torch_obj(obj, path_string):
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with io.BytesIO() as buffer:
-        torch.save(obj, buffer)
+        torch.save(obj, buffer, pickle_protocol=pickle.HIGHEST_PROTOCOL)
         obj_bytes = buffer.getvalue()
     obj_checksum = hashlib.sha256(obj_bytes).digest()
 
@@ -342,7 +342,7 @@ def save_torch_obj(obj, path_string):
     try:
         with tempfile.NamedTemporaryFile(dir=path.parent, mode="wb", delete=False) as file:
             tempfile_path = Path(file.name)
-            torch.save(payload, file)
+            torch.save(payload, file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
             file.flush()
             os.fsync(file.fileno())
         os.replace(tempfile_path, path)
