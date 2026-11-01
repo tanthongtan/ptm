@@ -358,7 +358,7 @@ def load_torch_obj(path_string):
     path = Path(path_string)
 
     with open(path, 'rb') as file:
-        payload = torch.load(file)
+        payload = torch.load(file, weights_only=False)
     assert isinstance(payload, tuple) and len(payload) == 2, "Payload has to be a 2-tuple of (checksum, data)."
 
     checksum, obj_bytes = payload
