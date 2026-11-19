@@ -99,11 +99,12 @@ class JointDistribution:
 
 class SamJointDistribution:
     
-    def __init__(self, alpha, c0, mu0, kappa1):
+    def __init__(self, alpha, c0, mu0, kappa1, positive = False):
         self.alpha = alpha
         self.c0 = c0
         self.mu0 = mu0
         self.kappa1 = kappa1
+        self.positive = positive
         
     def unnormalized_log_prob_per_chain(self, params, x, idx, beta=1):
         pi_sphere = params['pi_sphere']
@@ -115,6 +116,8 @@ class SamJointDistribution:
         scaling_factor = pi.shape[-2]/pi_chosen.shape[-2]
 
         mu = params['mu']
+        if self.positive == True:
+            mu = torch.abs(mu)
 
         return beta * scaling_factor * log_prob_sam_likelihood(pi=pi_chosen, kappa=self.kappa1, mu=mu, X=x).sum(dim=-1) \
                 + self.c0 * (self.mu0 * mu).sum(dim=-1).sum(dim=-1) \
