@@ -24,6 +24,7 @@ import pickle
 from pathlib import Path
 import hashlib
 import io
+from collections import defaultdict
 
 def get_topic_uniqueness(top_words_idx_all_topics):
     """
@@ -403,6 +404,13 @@ def load_checkpoint(path_string):
         history, history_iterations, extended_history, extended_history_iterations, 
         meta_history, topic_history, topic_history_iterations
     ) = [checkpoint_dict[key] for key in all_keys_list]
+
+    M = settings_dict["M"]
+
+    if history == {}:
+        history = defaultdict(lambda: np.empty((M, 0)))
+    if extended_history == {}:
+        extended_history = defaultdict(lambda: np.empty((M, 0)))
 
     return (i, settings_dict, params, vs, pi_sphere_samples, mu_samples, kappa_samples, 
             history, history_iterations, extended_history, extended_history_iterations, 

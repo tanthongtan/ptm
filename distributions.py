@@ -61,14 +61,21 @@ def log_prob_vptm_likelihood(pi, kappa, mu, X):
     dot = (pi * doc_topic_matmul).sum(dim=-1)
     return logcdk(mu.shape[-1], norm) + dot
 
-def log_prob_sam_likelihood(pi, kappa, mu, X):        
+def log_prob_sam_likelihood(pi, kappa, mu, X):
+    M = mu.shape[0]
+    vocab_size = mu.shape[-1]
+    num_topic = mu.shape[-2]
+    S = X.shape[0] // M
+            
     #get norm
-    gram_matrix = torch.mm(mu, mu.T)
-    squared_norm = (torch.mm(pi, gram_matrix) * pi).sum(dim=-1)
+    gram_matrix = torch.matmul(mu, mu.transpose(-2,-1))
+    squared_norm = (torch.matmul(pi, gram_matrix) * pi).sum(dim=-1)
     norm = squared_norm ** 0.5
 
     #get dot
-    doc_topic_matmul = torch.mm(X, mu.T)
+    doc_topic_matmul = torch.mm(X, mu.transpose(-2,-1)
+                                .reshape(vocab_size*M, num_topic))
+    doc_topic_matmul = doc_topic_matmul.reshape(M, S, num_topic)
     dot = (pi * doc_topic_matmul).sum(dim=-1)
     return kappa * dot / norm
 
@@ -97,7 +104,7 @@ class JointDistribution:
         
 
 
-class SamJointDistribution:
+class SamJointDistribution(JointDistribution):
     
     def __init__(self, alpha, c0, mu0, kappa1, positive = False):
         self.alpha = alpha
